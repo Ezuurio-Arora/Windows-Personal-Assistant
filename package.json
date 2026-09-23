@@ -2,6 +2,7 @@
   "name": "personal-assistant",
   "version": "1.0.0",
   "description": "Gemini-inspired AI Personal Assistant for Windows with Worldwide Android Companion",
+  "license": "GPL-3.0-or-later",
   "main": "electron/main.cjs",
   "type": "module",
   "scripts": {

@@ -114,3 +114,10 @@ The application will open on port `42000` (e.g. `http://localhost:42000`).
 4. Tap the link to open Personal Assistant in Google Chrome on your phone.
 5. In Chrome on Android, tap the three dots menu (⋮) and choose **"Add to Home screen"** / **"Install app"** to install it as a full-screen, native-feeling mobile app.
 6. You can now command your PC from anywhere in the world as long as your computer is on and connected to the internet!
+
+---
+
+## 📜 License
+
+This project is licensed under the **GNU General Public License v3.0** (GPLv3) - see the [LICENSE](LICENSE) file for details.
+
