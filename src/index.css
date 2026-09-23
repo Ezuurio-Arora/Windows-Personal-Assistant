@@ -1,0 +1,222 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    background-color: #131314;
+    color: #E3E3E3;
+    user-select: text !important;
+    -webkit-user-select: text !important;
+  }
+  ::selection {
+    background: rgba(125, 172, 248, 0.35);
+    color: #FFFFFF;
+  }
+  ::-moz-selection {
+    background: rgba(125, 172, 248, 0.35);
+    color: #FFFFFF;
+  }
+}
+
+/* Ensure chat content, user prompts, assistant text, and code are fully selectable */
+.user-select-text,
+.select-text,
+.markdown-body,
+.prose-gemini,
+.prose-gemini p,
+.prose-gemini span,
+.prose-gemini li,
+.prose-gemini code,
+.prose-gemini pre,
+.prose-gemini h1,
+.prose-gemini h2,
+.prose-gemini h3,
+.prose-gemini h4 {
+  user-select: text !important;
+  -webkit-user-select: text !important;
+}
+
+/* Custom Gemini subtle scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #282A2C;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #3C4043;
+}
+
+/* Sparkle glow effects */
+.gemini-gradient-text {
+  background: linear-gradient(135deg, #7DACF8 0%, #A8C7FA 50%, #D3E3FD 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.gemini-gradient-border {
+  border-image: linear-gradient(135deg, #7DACF8, #B87CF8) 1;
+}
+
+.gemini-pill-shadow {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), 0 0 1px rgba(255, 255, 255, 0.1);
+}
+
+.gemini-card-shadow {
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+/* Markdown typography improvements */
+.prose-gemini h1,
+.prose-gemini h2,
+.prose-gemini h3,
+.prose-gemini h4 {
+  color: #F1F3F4;
+  font-weight: 600;
+  margin-top: 1.25rem;
+  margin-bottom: 0.5rem;
+  letter-spacing: -0.01em;
+}
+
+.prose-gemini h1 {
+  font-size: 1.35rem;
+  line-height: 1.4;
+}
+
+.prose-gemini h2 {
+  font-size: 1.2rem;
+  line-height: 1.4;
+}
+
+.prose-gemini h3 {
+  font-size: 1.05rem;
+  line-height: 1.4;
+}
+
+.prose-gemini p {
+  margin-bottom: 0.75rem;
+  line-height: 1.65;
+}
+
+.prose-gemini strong {
+  color: #FFFFFF;
+  font-weight: 600;
+}
+
+.prose-gemini ul {
+  list-style-type: disc;
+  padding-left: 1.4rem;
+  margin-top: 0.5rem;
+  margin-bottom: 0.75rem;
+  space-y: 0.25rem;
+}
+
+.prose-gemini ol {
+  list-style-type: decimal;
+  padding-left: 1.4rem;
+  margin-top: 0.5rem;
+  margin-bottom: 0.75rem;
+  space-y: 0.25rem;
+}
+
+.prose-gemini li {
+  margin-bottom: 0.35rem;
+  line-height: 1.6;
+}
+
+.prose-gemini a {
+  color: #A8C7FA;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: color 0.15s;
+}
+
+.prose-gemini a:hover {
+  color: #D3E3FD;
+}
+
+.prose-gemini blockquote {
+  border-left: 3px solid #7DACF8;
+  padding-left: 1rem;
+  margin-top: 0.75rem;
+  margin-bottom: 0.75rem;
+  color: #9AA0A6;
+  font-style: italic;
+}
+
+.prose-gemini code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  background-color: #282A2C;
+  color: #E3E3E3;
+  padding: 0.15rem 0.4rem;
+  border-radius: 0.375rem;
+  font-size: 0.88em;
+  border: 1px solid #3C4043;
+}
+
+.prose-gemini pre code {
+  background-color: transparent;
+  border: none;
+  padding: 0;
+}
+
+.prose-gemini table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0;
+  font-size: 0.9em;
+}
+
+.prose-gemini th,
+.prose-gemini td {
+  border: 1px solid #282A2C;
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+}
+
+.prose-gemini th {
+  background-color: #1E1F20;
+  font-weight: 600;
+  color: #F1F3F4;
+}
+
+/* Gemini progress bar glow & shimmer animations */
+@keyframes gemini-shimmer {
+  0% {
+    transform: translateX(-150%);
+  }
+  100% {
+    transform: translateX(250%);
+  }
+}
+
+@keyframes gemini-pulse-glow {
+  0%, 100% {
+    filter: drop-shadow(0 0 6px rgba(125, 172, 248, 0.4)) drop-shadow(0 0 12px rgba(184, 124, 248, 0.25));
+  }
+  50% {
+    filter: drop-shadow(0 0 14px rgba(125, 172, 248, 0.7)) drop-shadow(0 0 24px rgba(184, 124, 248, 0.45));
+  }
+}
+
+.gemini-shimmer-effect {
+  animation: gemini-shimmer 2s infinite ease-in-out;
+}
+
+.gemini-progress-glow {
+  box-shadow: 0 0 12px rgba(125, 172, 248, 0.5), 0 0 20px rgba(184, 124, 248, 0.35);
+}
+
+

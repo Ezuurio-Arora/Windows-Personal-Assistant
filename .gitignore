@@ -1,0 +1,68 @@
+# ==========================================
+# Personal Assistant Project .gitignore
+# ==========================================
+
+# Node.js & Dependencies
+node_modules/
+package-lock.json.bak
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-debug.log*
+
+# Vite & Web Build Outputs
+dist/
+dist-ssr/
+*.local
+
+# Server Binaries & Runtime Data
+server/bin/
+server/data/store.json
+*.log
+logs/
+
+# Flutter & Dart (Mobile App)
+mobile/.dart_tool/
+mobile/build/
+mobile/.flutter-plugins
+mobile/.flutter-plugins-dependencies
+mobile/.packages
+mobile/.pub-cache/
+mobile/.pub/
+
+# Android Native Artifacts
+mobile/android/.gradle/
+mobile/android/local.properties
+mobile/android/app/build/
+mobile/android/app/debug/
+mobile/android/app/profile/
+mobile/android/app/release/
+*.apk
+*.aab
+*.dex
+*.class
+
+# Keystores & Signing Keys
+*.keystore
+*.jks
+key.properties
+
+# Environment Variables & Secrets
+.env
+.env.*
+!.env.example
+
+# Temporary Scratch & OS Files
+.agents/
+scratch/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE & Editor Settings
+.vscode/*
+!.vscode/settings.json
+!.vscode/launch.json
+.idea/
+*.iml

@@ -1,0 +1,53 @@
+name: personal_assistant
+description: "Hardened, production-grade Flutter Android companion for Personal Assistant."
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+  flutter: ">=3.19.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # State Management (MVVM)
+  provider: ^6.1.2
+
+  # Biometric Keystore & Security (R4)
+  local_auth: ^2.3.0
+  flutter_secure_storage: ^9.2.2
+
+  # QR Code Scanning & Generation (R2, R3)
+  mobile_scanner: ^5.2.3
+  qr_flutter: ^4.1.0
+
+  # Networking, Discovery & Real-Time Comms (R2, R5, R6)
+  web_socket_channel: ^3.0.1
+  http: ^1.2.2
+  multicast_dns: ^0.3.2+7
+  network_info_plus: ^5.0.3
+
+  # Cryptography & HMAC Mutual Authentication (R4)
+  crypto: ^3.0.5
+
+  # Speech Dictation & Audio Synthesis (R7)
+  speech_to_text: ^7.0.0
+  flutter_tts: ^4.2.0
+
+  # Gemini 2.0 Dark UI Aesthetic & Animations (R1)
+  google_fonts: ^6.2.1
+  flutter_animate: ^4.5.0
+  cupertino_icons: ^1.0.8
+
+  # Helpers & Utilities
+  uuid: ^4.5.1
+  intl: ^0.19.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.2
+
+flutter:
+  uses-material-design: true

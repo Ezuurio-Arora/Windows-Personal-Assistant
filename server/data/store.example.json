@@ -1,0 +1,13 @@
+{
+  "settings": {
+    "activeProvider": "lmstudio",
+    "model": "local-model",
+    "customBaseUrl": "http://127.0.0.1:1234/v1",
+    "customApiKey": "",
+    "safetyMode": "confirm",
+    "theme": "dark",
+    "persona": "general"
+  },
+  "pairedDevice": null,
+  "sessions": []
+}

@@ -1,0 +1,18 @@
+{
+  "name": "Personal Assistant",
+  "short_name": "Assistant",
+  "description": "Autonomous Gemini-style AI Assistant with Windows PC Control",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#131314",
+  "theme_color": "#131314",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/gemini-spark.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
