@@ -3,13 +3,16 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../providers/connection_provider.dart';
 import '../providers/actions_provider.dart';
+import '../providers/update_provider.dart';
 import '../services/auth_service.dart';
 import '../theme/gemini_theme.dart';
+import '../widgets/gemini_gradient_bar.dart';
 
 class SettingsScreen extends StatefulWidget {
   final AuthService? authService;
+  final UpdateProvider? updateProvider;
 
-  const SettingsScreen({super.key, this.authService});
+  const SettingsScreen({super.key, this.authService, this.updateProvider});
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -253,6 +256,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const SizedBox(height: 24),
 
+          // Software Updates
+          const Text(
+            'Software Updates',
+            style: TextStyle(
+              color: GeminiColors.textHeading,
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              letterSpacing: -0.2,
+            ),
+          ),
+          const SizedBox(height: 12),
+          _buildAutoUpdateTile(context, conn),
+          const SizedBox(height: 24),
+
           // Action Buttons: Disconnect / Unpair & Emergency Killswitch
           ElevatedButton.icon(
             onPressed: () async {
@@ -350,6 +367,171 @@ class _SettingsScreenState extends State<SettingsScreen> {
               fontSize: 13,
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAutoUpdateTile(BuildContext context, ConnectionProvider conn) {
+    UpdateProvider? updateProvider = widget.updateProvider;
+    if (updateProvider == null) {
+      try {
+        updateProvider = context.watch<UpdateProvider>();
+      } catch (_) {}
+    }
+
+    final isChecking = updateProvider?.isChecking ?? false;
+    final isUpdateAvailable = updateProvider?.isUpdateAvailable ?? false;
+    final isDownloading = updateProvider?.isDownloading ?? false;
+    final downloadProgress = updateProvider?.downloadProgress ?? 0.0;
+    final versionStr = updateProvider?.latestVersion?.version ?? '1.1.0';
+
+    return Container(
+      decoration: BoxDecoration(
+        color: GeminiColors.surfaceContainer,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: GeminiColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.25),
+            blurRadius: 12,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+            leading: const Icon(Icons.system_update_rounded, color: GeminiColors.primary),
+            title: const Text(
+              'Auto-Update from Desktop',
+              style: TextStyle(
+                color: GeminiColors.textHeading,
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            subtitle: Text(
+              isUpdateAvailable
+                  ? '✨ Update v$versionStr available from Desktop Hub'
+                  : 'Current version: 1.0.0 (Up to date)',
+              style: TextStyle(
+                color: isUpdateAvailable ? GeminiColors.primary : GeminiColors.textSecondary,
+                fontSize: 12,
+              ),
+            ),
+            trailing: isChecking
+                ? const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: GeminiColors.primary,
+                    ),
+                  )
+                : ElevatedButton(
+                    key: const Key('check_updates_btn'),
+                    onPressed: () async {
+                      try {
+                        HapticFeedback.lightImpact();
+                      } catch (_) {}
+                      await updateProvider?.checkUpdateFromHost(
+                        conn.session?.lanIp ?? conn.targetHostIp,
+                        conn.session?.port ?? 42000,
+                      );
+                      if (context.mounted) {
+                        final isAvail = updateProvider?.isUpdateAvailable ?? false;
+                        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              isAvail
+                                  ? '✨ Update v${updateProvider?.latestVersion?.version} available from Desktop Hub!'
+                                  : (conn.isConnected
+                                      ? 'App is up to date (v1.0.0)'
+                                      : 'Desktop Hub unreachable. Please check connection.'),
+                              style: const TextStyle(color: GeminiColors.textBody, fontSize: 13),
+                            ),
+                            backgroundColor: GeminiColors.surfaceContainer,
+                            duration: const Duration(seconds: 2),
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              side: const BorderSide(color: GeminiColors.border),
+                            ),
+                          ),
+                        );
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: GeminiColors.primary,
+                      foregroundColor: GeminiColors.canvas,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      minimumSize: const Size(0, 36),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    ),
+                    child: const Text(
+                      'Check for Updates',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+          ),
+          if (isUpdateAvailable) ...[
+            const Divider(color: GeminiColors.border, height: 1),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    updateProvider?.latestVersion?.releaseNotes ??
+                        'A newer version of the companion app is ready for download from the Desktop Hub.',
+                    style: const TextStyle(color: GeminiColors.textBody, fontSize: 12),
+                  ),
+                  const SizedBox(height: 12),
+                  if (isDownloading) ...[
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: GeminiGradientBar(
+                        value: downloadProgress >= 0 ? downloadProgress : 0.5,
+                        isIndeterminate: downloadProgress < 0,
+                        height: 4,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      downloadProgress >= 0
+                          ? 'Downloading: ${(downloadProgress * 100).toInt()}%'
+                          : 'Downloading update...',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: GeminiColors.textSecondary, fontSize: 11),
+                    ),
+                  ] else
+                    ElevatedButton.icon(
+                      key: const Key('install_update_settings_btn'),
+                      onPressed: () async {
+                        try {
+                          await HapticFeedback.mediumImpact();
+                        } catch (_) {}
+                        await updateProvider?.startUpdate();
+                        try {
+                          await HapticFeedback.mediumImpact();
+                        } catch (_) {}
+                      },
+                      icon: const Icon(Icons.download_rounded, size: 16),
+                      label: Text('Download & Install v$versionStr'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: GeminiColors.purpleProgress,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );

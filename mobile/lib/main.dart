@@ -6,10 +6,12 @@ import 'services/auth_service.dart';
 import 'services/hmac_service.dart';
 import 'services/socket_service.dart';
 import 'services/notification_service.dart';
+import 'services/update_service.dart';
 import 'providers/connection_provider.dart';
 import 'providers/chat_provider.dart';
 import 'providers/actions_provider.dart';
 import 'providers/screen_stream_provider.dart';
+import 'providers/update_provider.dart';
 import 'screens/main_shell.dart';
 import 'screens/scan_screen.dart';
 
@@ -21,6 +23,7 @@ void main() async {
   final socketService = WebSocketChannelService(hmacService: hmacService);
   final notificationService = LocalNotificationService();
   await notificationService.initialize();
+  final updateService = UpdateService();
 
   runApp(
     PersonalAssistantApp(
@@ -28,6 +31,7 @@ void main() async {
       hmacService: hmacService,
       socketService: socketService,
       notificationService: notificationService,
+      updateService: updateService,
     ),
   );
 }
@@ -37,6 +41,8 @@ class PersonalAssistantApp extends StatelessWidget {
   final HmacService hmacService;
   final SocketService socketService;
   final NotificationService? notificationService;
+  final UpdateService? updateService;
+  final UpdateProvider? updateProvider;
 
   const PersonalAssistantApp({
     super.key,
@@ -44,11 +50,14 @@ class PersonalAssistantApp extends StatelessWidget {
     required this.hmacService,
     required this.socketService,
     this.notificationService,
+    this.updateService,
+    this.updateProvider,
   });
 
   @override
   Widget build(BuildContext context) {
     final notif = notificationService ?? LocalNotificationService();
+    final updater = updateService ?? UpdateService();
 
     return MultiProvider(
       providers: [
@@ -56,12 +65,16 @@ class PersonalAssistantApp extends StatelessWidget {
         Provider<HmacService>.value(value: hmacService),
         Provider<SocketService>.value(value: socketService),
         Provider<NotificationService>.value(value: notif),
+        Provider<UpdateService>.value(value: updater),
         ChangeNotifierProvider<ConnectionProvider>(
           create: (_) => ConnectionProvider(
             authService: authService,
             hmacService: hmacService,
             socketService: socketService,
           ),
+        ),
+        ChangeNotifierProvider<UpdateProvider>(
+          create: (_) => updateProvider ?? UpdateProvider(updateService: updater),
         ),
         ChangeNotifierProxyProvider<ConnectionProvider, ChatProvider>(
           create: (ctx) => ChatProvider(

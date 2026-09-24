@@ -4,6 +4,8 @@ import { WebSocketServer, WebSocket } from 'ws';
 import cors from 'cors';
 import os from 'os';
 import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
 import crypto from 'crypto';
 import QRCode from 'qrcode';
 
@@ -290,10 +292,75 @@ app.post('/api/open-url', async (req, res) => {
 });
 
 // ----------------------------------------------------
-// APK Download Endpoints for Android Companion App
+// APK Download & Auto-Update Endpoints
 // ----------------------------------------------------
+
+function getApkPath() {
+  const relPath = path.join('mobile', 'build', 'app', 'outputs', 'flutter-apk', 'app-debug.apk');
+  const candidate1 = path.resolve(relPath);
+  if (fs.existsSync(candidate1)) return candidate1;
+  try {
+    const serverDir = path.dirname(fileURLToPath(import.meta.url));
+    const candidate2 = path.resolve(serverDir, '..', relPath);
+    if (fs.existsSync(candidate2)) return candidate2;
+  } catch (e) {}
+  return candidate1;
+}
+
+function getAppVersionInfo() {
+  const localIps = getLocalIpAddresses();
+  const primaryIp = localIps[0]?.address || '127.0.0.1';
+  const apkPath = getApkPath();
+
+  const baseInfo = {
+    appName: 'Personal Assistant',
+    versionName: '1.1.0',
+    versionCode: 2,
+    apkUrl: `http://${primaryIp}:${PORT}/app-debug.apk`,
+    releaseNotes: 'Personal Assistant v1.1.0 update with desktop hub versioning & auto-update support.'
+  };
+
+  try {
+    const stats = fs.statSync(apkPath);
+    return {
+      ...baseInfo,
+      fileSize: stats.size,
+      lastModified: stats.mtimeMs
+    };
+  } catch (err) {
+    console.warn('[Version] Could not stat APK (may be rebuilding):', err.message);
+    return {
+      ...baseInfo,
+      fileSize: 0,
+      lastModified: null,
+      isRebuilding: true
+    };
+  }
+}
+
+app.get('/api/app/version', (req, res) => {
+  try {
+    const versionPayload = getAppVersionInfo();
+    res.status(200).json(versionPayload);
+  } catch (err) {
+    console.error('[Version] Error getting app version:', err);
+    const localIps = getLocalIpAddresses();
+    const primaryIp = localIps[0]?.address || '127.0.0.1';
+    res.status(200).json({
+      appName: 'Personal Assistant',
+      versionName: '1.1.0',
+      versionCode: 2,
+      fileSize: 0,
+      lastModified: null,
+      apkUrl: `http://${primaryIp}:${PORT}/app-debug.apk`,
+      releaseNotes: 'Personal Assistant v1.1.0 update',
+      isRebuilding: true
+    });
+  }
+});
+
 app.get('/app-debug.apk', (req, res) => {
-  const apkPath = path.resolve('mobile/build/app/outputs/flutter-apk/app-debug.apk');
+  const apkPath = getApkPath();
   res.download(apkPath, 'PersonalAssistant.apk', (err) => {
     if (err) {
       console.error('[APK Download] Error transferring file:', err);
@@ -745,6 +812,27 @@ wss.on('connection', (ws, req) => {
     })
   );
 
+  // Send initial app:version packet upon connection handshake
+  try {
+    const versionPayload = getAppVersionInfo();
+    ws.send(
+      JSON.stringify({
+        event: 'app:version',
+        data: {
+          appName: versionPayload.appName,
+          versionName: versionPayload.versionName,
+          versionCode: versionPayload.versionCode,
+          apkUrl: versionPayload.apkUrl,
+          fileSize: versionPayload.fileSize,
+          lastModified: versionPayload.lastModified,
+          releaseNotes: versionPayload.releaseNotes
+        }
+      })
+    );
+  } catch (err) {
+    console.warn('[WS] Failed to send initial app:version packet:', err.message);
+  }
+
   ws.on('message', async (raw) => {
     try {
       const parsed = JSON.parse(raw);
@@ -755,6 +843,26 @@ wss.on('connection', (ws, req) => {
       if (auth?.sessionToken) {
         ws.sessionToken = auth.sessionToken;
         ws.isMobile = true;
+      }
+
+      // App version query
+      if (event === 'app:version' || event === 'app:check_version') {
+        const versionPayload = getAppVersionInfo();
+        ws.send(
+          JSON.stringify({
+            event: 'app:version',
+            data: {
+              appName: versionPayload.appName,
+              versionName: versionPayload.versionName,
+              versionCode: versionPayload.versionCode,
+              apkUrl: versionPayload.apkUrl,
+              fileSize: versionPayload.fileSize,
+              lastModified: versionPayload.lastModified,
+              releaseNotes: versionPayload.releaseNotes
+            }
+          })
+        );
+        return;
       }
 
       // ----------------------------------------------------

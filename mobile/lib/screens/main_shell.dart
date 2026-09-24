@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../providers/connection_provider.dart';
 import '../providers/chat_provider.dart';
 import '../providers/screen_stream_provider.dart';
+import '../providers/update_provider.dart';
 import '../services/auth_service.dart';
 import '../theme/gemini_theme.dart';
 import '../widgets/gemini_gradient_bar.dart';
@@ -25,6 +26,7 @@ class MainShell extends StatefulWidget {
   final bool? isConnected;
   final String? hostName;
   final AuthService? authService;
+  final UpdateProvider? updateProvider;
 
   const MainShell({
     super.key,
@@ -37,6 +39,7 @@ class MainShell extends StatefulWidget {
     this.isConnected,
     this.hostName,
     this.authService,
+    this.updateProvider,
   });
 
   @override
@@ -207,8 +210,16 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
       conn = context.watch<ConnectionProvider>();
     } catch (_) {}
 
+    UpdateProvider? updateProvider = widget.updateProvider;
+    if (updateProvider == null) {
+      try {
+        updateProvider = context.watch<UpdateProvider>();
+      } catch (_) {}
+    }
+
     final effectiveConnected = widget.isConnected ?? conn?.isConnected ?? false;
     final effectiveHostName = widget.hostName ?? conn?.session?.hostName ?? (effectiveConnected ? 'PC Host' : 'Offline');
+    final showUpdateBanner = effectiveConnected && (updateProvider?.isUpdateAvailable ?? false);
 
     final screens = [
       widget.chatScreen ?? const ChatScreen(),
@@ -281,9 +292,17 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
           child: GeminiGradientBar(value: 1.0, height: 3),
         ),
       ),
-      body: IndexedStack(
-        index: _currentIndex,
-        children: screens,
+      body: Column(
+        children: [
+          if (showUpdateBanner && updateProvider != null)
+            _buildUpdateBanner(context, updateProvider),
+          Expanded(
+            child: IndexedStack(
+              index: _currentIndex,
+              children: screens,
+            ),
+          ),
+        ],
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
@@ -449,6 +468,142 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildUpdateBanner(
+    BuildContext context,
+    UpdateProvider updateProvider,
+  ) {
+    return ListenableBuilder(
+      listenable: updateProvider,
+      builder: (context, _) {
+        final versionStr = updateProvider.latestVersion?.version ?? '1.1.0';
+        final isDownloading = updateProvider.isDownloading;
+        final progress = updateProvider.downloadProgress;
+
+        return Container(
+          key: const Key('update_banner_pill'),
+          margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            color: GeminiColors.surfaceContainer,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: GeminiColors.primary.withOpacity(0.4),
+              width: 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: GeminiColors.primary.withOpacity(0.12),
+                blurRadius: 10,
+                spreadRadius: 1,
+              ),
+              BoxShadow(
+                color: Colors.black.withOpacity(0.5),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Material(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(20),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(20),
+              onTap: isDownloading
+                  ? null
+                  : () async {
+                      try {
+                        await HapticFeedback.mediumImpact();
+                      } catch (_) {}
+                      await updateProvider.startUpdate();
+                      try {
+                        await HapticFeedback.mediumImpact();
+                      } catch (_) {}
+                    },
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: GeminiColors.primary.withOpacity(0.18),
+                            shape: BoxShape.circle,
+                          ),
+                          child: isDownloading
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: GeminiColors.primary,
+                                  ),
+                                )
+                              : const Icon(
+                                  Icons.auto_awesome,
+                                  color: GeminiColors.primary,
+                                  size: 16,
+                                ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            isDownloading
+                                ? (progress >= 0
+                                    ? 'Downloading update... ${(progress * 100).toInt()}%'
+                                    : 'Downloading update...')
+                                : '✨ Update v$versionStr available from Desktop Hub',
+                            style: const TextStyle(
+                              color: GeminiColors.textHeading,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: -0.1,
+                            ),
+                          ),
+                        ),
+                        if (!isDownloading) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              gradient: GeminiColors.geminiGradient,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Text(
+                              'Install',
+                              style: TextStyle(
+                                color: GeminiColors.canvas,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    if (isDownloading) ...[
+                      const SizedBox(height: 10),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(4),
+                        child: GeminiGradientBar(
+                          value: progress >= 0 ? progress : 0.5,
+                          isIndeterminate: progress < 0,
+                          height: 4,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
