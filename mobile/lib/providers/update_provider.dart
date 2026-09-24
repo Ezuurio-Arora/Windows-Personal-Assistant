@@ -3,7 +3,7 @@ import '../services/update_service.dart';
 
 class UpdateProvider extends ChangeNotifier {
   final UpdateService _updateService;
-  final int currentVersionCode;
+  int currentVersionCode;
 
   bool _isChecking = false;
   bool _isUpdateAvailable = false;
@@ -14,8 +14,20 @@ class UpdateProvider extends ChangeNotifier {
 
   UpdateProvider({
     UpdateService? updateService,
-    this.currentVersionCode = 1,
-  }) : _updateService = updateService ?? UpdateService();
+    this.currentVersionCode = 2,
+  }) : _updateService = updateService ?? UpdateService() {
+    _initVersionCode();
+  }
+
+  Future<void> _initVersionCode() async {
+    try {
+      final code = await _updateService.getInstalledVersionCode();
+      if (code > 0 && code != currentVersionCode) {
+        currentVersionCode = code;
+        notifyListeners();
+      }
+    } catch (_) {}
+  }
 
   bool get isChecking => _isChecking;
   bool get isUpdateAvailable => _isUpdateAvailable;
@@ -70,6 +82,8 @@ class UpdateProvider extends ChangeNotifier {
         },
       );
       _isDownloading = false;
+      _isUpdateAvailable = false;
+      _latestVersion = null;
       notifyListeners();
     } catch (e) {
       _isDownloading = false;

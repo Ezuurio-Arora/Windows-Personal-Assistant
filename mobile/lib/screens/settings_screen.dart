@@ -449,7 +449,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               isAvail
                                   ? '✨ Update v${updateProvider?.latestVersion?.version} available from Desktop Hub!'
                                   : (conn.isConnected
-                                      ? 'App is up to date (v1.0.0)'
+                                      ? 'App is up to date (v1.1.0)'
                                       : 'Desktop Hub unreachable. Please check connection.'),
                               style: const TextStyle(color: GeminiColors.textBody, fontSize: 13),
                             ),

@@ -87,6 +87,16 @@ class UpdateService {
   })  : _httpClient = httpClient ?? http.Client(),
         _methodChannel = methodChannel ?? const MethodChannel(channelName);
 
+  Future<int> getInstalledVersionCode() async {
+    try {
+      final res = await _methodChannel.invokeMethod<Map>('getAppVersion');
+      if (res != null && res['versionCode'] != null) {
+        return (res['versionCode'] as num).toInt();
+      }
+    } catch (_) {}
+    return 2;
+  }
+
   Future<AppVersionInfo?> checkForUpdate(
     String hostUrl,
     int currentVersionCode,
