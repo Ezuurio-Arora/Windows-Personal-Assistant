@@ -5,7 +5,7 @@ import 'package:personal_assistant/theme/gemini_theme.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  GoogleFonts.config.allowRuntimeFetching = false;
+  GoogleFonts.config.allowRuntimeFetching = true;
   group('Gemini 2.0 Theme Tests', () {
     test('Gemini 2.0 Color Tokens match exact hex values', () {
       expect(GeminiColors.canvas.value, equals(0xFF000000));

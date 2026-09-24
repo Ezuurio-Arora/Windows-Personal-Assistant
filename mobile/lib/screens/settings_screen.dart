@@ -331,6 +331,73 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const SizedBox(height: 12),
           ElevatedButton.icon(
+            key: const Key('killswitch_btn'),
+            onPressed: () {
+              HapticFeedback.lightImpact();
+              showDialog(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  backgroundColor: GeminiColors.surfaceContainer,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(28),
+                    side: const BorderSide(color: GeminiColors.border, width: 1),
+                  ),
+                  title: const Row(
+                    children: [
+                      Icon(Icons.lock_outline_rounded, color: GeminiColors.primary, size: 22),
+                      SizedBox(width: 8),
+                      Text(
+                        'Lock Workstation?',
+                        style: TextStyle(
+                          color: GeminiColors.textHeading,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                        ),
+                      ),
+                    ],
+                  ),
+                  content: const Text(
+                    'This locks your Windows desktop immediately. Your paired session stays connected so you can continue using your phone.',
+                    style: TextStyle(color: GeminiColors.textBody, fontSize: 14),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(ctx).pop(),
+                      child: const Text('Cancel', style: TextStyle(color: GeminiColors.textSecondary)),
+                    ),
+                    ElevatedButton(
+                      onPressed: () {
+                        Navigator.of(ctx).pop();
+                        context.read<ActionsProvider>().lockPc();
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: GeminiColors.primary,
+                        foregroundColor: GeminiColors.canvas,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      ),
+                      child: const Text('Lock PC'),
+                    ),
+                  ],
+                ),
+              );
+            },
+            icon: const Icon(Icons.lock_outline_rounded, color: GeminiColors.primary),
+            label: const Text(
+              'Lock PC Workstation',
+              style: TextStyle(color: GeminiColors.primary, fontWeight: FontWeight.bold),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: GeminiColors.elevatedCard,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(28),
+                side: const BorderSide(color: GeminiColors.border),
+              ),
+              elevation: 0,
+            ),
+          ),
+          const SizedBox(height: 12),
+          ElevatedButton.icon(
             onPressed: () {
               HapticFeedback.lightImpact();
               context.read<ActionsProvider>().triggerEmergencyKillswitch();

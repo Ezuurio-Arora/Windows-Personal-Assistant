@@ -1,11 +1,15 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_tts/flutter_tts.dart';
+import 'package:http/http.dart' as http;
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import '../models/chat_message.dart';
+import '../models/device_session.dart';
 import '../services/socket_service.dart';
+import '../services/hmac_service.dart';
 import '../services/notification_service.dart';
 import 'connection_provider.dart';
 
@@ -15,6 +19,8 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
   final NotificationService _notificationService;
   final FlutterTts _tts;
   final stt.SpeechToText _speech;
+  final http.Client _httpClient;
+  final HmacService _hmacService;
 
   final List<ChatMessage> _messages = [];
   bool _isStreaming = false;
@@ -38,14 +44,26 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
     NotificationService? notificationService,
     FlutterTts? tts,
     stt.SpeechToText? speech,
+    http.Client? httpClient,
+    HmacService? hmacService,
   })  : _socketService = socketService,
         _connectionProvider = connectionProvider,
         _notificationService = notificationService ?? LocalNotificationService(),
         _tts = tts ?? FlutterTts(),
-        _speech = speech ?? stt.SpeechToText() {
+        _speech = speech ?? stt.SpeechToText(),
+        _httpClient = httpClient ?? http.Client(),
+        _hmacService = hmacService ?? CryptoHmacService() {
     _initTts();
     WidgetsBinding.instance.addObserver(this);
     _eventSubscription = _socketService.eventStream.listen(_onSocketEvent);
+    _connectionProvider.addListener(_onConnectionChanged);
+    loadSessionHistory();
+  }
+
+  void _onConnectionChanged() {
+    if (_connectionProvider.isConnected && _messages.isEmpty) {
+      loadSessionHistory();
+    }
   }
 
   NotificationService get notificationService => _notificationService;
@@ -92,6 +110,9 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
     final data = packet['data'] as Map<String, dynamic>? ?? {};
 
     switch (event) {
+      case 'message:created':
+        _handleMessageCreated(data);
+        break;
       case 'message:token':
         _handleToken(data);
         break;
@@ -116,17 +137,41 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
+  void _handleMessageCreated(Map<String, dynamic> data) {
+    final message = data['message'] as Map<String, dynamic>?;
+    if (message == null) return;
+    final role = message['role'] as String?;
+    final id = message['id'] as String?;
+    if (role == 'assistant' && id != null) {
+      _activeMessageId = id;
+      final index = _messages.indexWhere((m) => m.id == id);
+      if (index == -1) {
+        _messages.add(ChatMessage(
+          id: id,
+          role: MessageRole.assistant,
+          content: message['content'] as String? ?? '',
+          timestamp: DateTime.now(),
+          isStreaming: true,
+          stage: SubagentStage.evaluating,
+        ));
+      }
+      notifyListeners();
+    }
+  }
+
   void _handleMessageError(Map<String, dynamic> data) {
     _isStreaming = false;
     final messageId = data['messageId'] as String? ?? _activeMessageId;
     final errorText = data['error'] as String? ?? data['message'] as String? ?? 'An error occurred processing your request.';
+    final content = data['content'] as String?;
+    final displayText = (content != null && content.isNotEmpty) ? content : 'Error: $errorText';
 
     if (messageId != null) {
       final index = _messages.indexWhere((m) => m.id == messageId);
       if (index != -1) {
         final old = _messages[index];
         _messages[index] = old.copyWith(
-          content: old.content.isEmpty ? 'Error: $errorText' : '${old.content}\n\n[Error: $errorText]',
+          content: old.content.isEmpty ? displayText : '${old.content}\n\n$displayText',
           isStreaming: false,
           stage: SubagentStage.completed,
         );
@@ -134,7 +179,7 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
         _messages.add(ChatMessage(
           id: messageId,
           role: MessageRole.assistant,
-          content: 'Error: $errorText',
+          content: displayText,
           timestamp: DateTime.now(),
           isStreaming: false,
           stage: SubagentStage.completed,
@@ -143,7 +188,7 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
     } else if (_messages.isNotEmpty && _messages.last.role == MessageRole.assistant) {
       final last = _messages.last;
       _messages[_messages.length - 1] = last.copyWith(
-        content: last.content.isEmpty ? 'Error: $errorText' : '${last.content}\n\n[Error: $errorText]',
+        content: last.content.isEmpty ? displayText : '${last.content}\n\n$displayText',
         isStreaming: false,
         stage: SubagentStage.completed,
       );
@@ -151,7 +196,7 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
       _messages.add(ChatMessage(
         id: 'msg_err_${DateTime.now().millisecondsSinceEpoch}',
         role: MessageRole.assistant,
-        content: 'Error: $errorText',
+        content: displayText,
         timestamp: DateTime.now(),
         isStreaming: false,
         stage: SubagentStage.completed,
@@ -166,6 +211,7 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
     final fullContent = data['fullContent'] as String?;
 
     if (messageId == null) return;
+    _activeMessageId = messageId;
 
     final index = _messages.indexWhere((m) => m.id == messageId);
     if (index != -1) {
@@ -184,7 +230,6 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
       ));
     }
     _isStreaming = true;
-    _activeMessageId = messageId;
     notifyListeners();
   }
 
@@ -194,9 +239,11 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
     _subagentLabel = data['label'] as String? ?? 'Processing...';
     _activeTool = data['tool'] as String?;
     final stageStr = data['stage'] as String?;
+    final messageId = data['messageId'] as String? ?? _activeMessageId;
 
-    if (_activeMessageId != null) {
-      final index = _messages.indexWhere((m) => m.id == _activeMessageId);
+    if (messageId != null) {
+      _activeMessageId = messageId;
+      final index = _messages.indexWhere((m) => m.id == messageId);
       if (index != -1) {
         _messages[index] = _messages[index].copyWith(
           stage: SubagentStage.fromString(stageStr),
@@ -204,6 +251,18 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
           subagentName: data['subagentName'] as String?,
           activeTool: _activeTool,
         );
+      } else {
+        _messages.add(ChatMessage(
+          id: messageId,
+          role: MessageRole.assistant,
+          content: '',
+          timestamp: DateTime.now(),
+          isStreaming: true,
+          stage: SubagentStage.fromString(stageStr),
+          progressPercent: _subagentProgress,
+          subagentName: data['subagentName'] as String?,
+          activeTool: _activeTool,
+        ));
       }
     }
 
@@ -219,14 +278,47 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
     _isStreaming = false;
     _subagentProgress = 1.0;
     _subagentLabel = 'Completed';
-    if (_activeMessageId != null) {
-      final index = _messages.indexWhere((m) => m.id == _activeMessageId);
+    final messageId = data['messageId'] as String? ?? _activeMessageId;
+    final content = data['content'] as String?;
+
+    if (messageId != null) {
+      final index = _messages.indexWhere((m) => m.id == messageId);
       if (index != -1) {
-        _messages[index] = _messages[index].copyWith(
+        final old = _messages[index];
+        _messages[index] = old.copyWith(
+          content: (content != null && content.isNotEmpty) ? content : old.content,
           isStreaming: false,
           progressPercent: 1.0,
           stage: SubagentStage.completed,
         );
+      } else if (content != null && content.isNotEmpty) {
+        _messages.add(ChatMessage(
+          id: messageId,
+          role: MessageRole.assistant,
+          content: content,
+          timestamp: DateTime.now(),
+          isStreaming: false,
+          stage: SubagentStage.completed,
+        ));
+      }
+    } else if (content != null && content.isNotEmpty) {
+      if (_messages.isNotEmpty && _messages.last.role == MessageRole.assistant) {
+        final last = _messages.last;
+        _messages[_messages.length - 1] = last.copyWith(
+          content: content,
+          isStreaming: false,
+          progressPercent: 1.0,
+          stage: SubagentStage.completed,
+        );
+      } else {
+        _messages.add(ChatMessage(
+          id: 'msg_asst_${DateTime.now().millisecondsSinceEpoch}',
+          role: MessageRole.assistant,
+          content: content,
+          timestamp: DateTime.now(),
+          isStreaming: false,
+          stage: SubagentStage.completed,
+        ));
       }
     }
     _triggerAiCompletion(data);
@@ -303,27 +395,145 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   void sendMessage(String text) {
-    if (text.trim().isEmpty) return;
+    final cleanText = text.trim();
+    if (cleanText.isEmpty) return;
 
     final session = _connectionProvider.session;
-    if (session == null || !_connectionProvider.isConnected) return;
+    if (session == null) {
+      final userMsg = ChatMessage.user(
+        id: 'msg_user_${DateTime.now().millisecondsSinceEpoch}',
+        content: cleanText,
+      );
+      _messages.add(userMsg);
+      _messages.add(ChatMessage(
+        id: 'msg_sys_${DateTime.now().millisecondsSinceEpoch}',
+        role: MessageRole.system,
+        content: 'Not connected to your PC. Please open Settings and scan the QR code to pair with your Desktop Hub.',
+        timestamp: DateTime.now(),
+        stage: null,
+      ));
+      notifyListeners();
+      return;
+    }
 
     final userMsg = ChatMessage.user(
       id: 'msg_user_${DateTime.now().millisecondsSinceEpoch}',
-      content: text,
+      content: cleanText,
     );
     _messages.add(userMsg);
     _isStreaming = true;
-    _subagentProgress = 0.0;
-    _subagentLabel = 'Evaluating intent...';
+    _subagentProgress = 0.05;
+    _subagentLabel = 'Connecting to Windows PC...';
     notifyListeners();
 
-    _socketService.sendEvent(
-      'chat:send',
-      {'content': text, 'sessionId': 'mobile_main'},
-      sessionToken: session.sessionToken,
-      hmacSecret: session.hmacSecret,
-    );
+    if (_connectionProvider.isConnected && _socketService.isConnected) {
+      _socketService.sendEvent(
+        'chat:send',
+        {'content': cleanText, 'sessionId': 'mobile_main'},
+        sessionToken: session.sessionToken,
+        hmacSecret: session.hmacSecret,
+      );
+    } else {
+      _connectionProvider.retryConnection();
+      _sendViaHttp(session, cleanText);
+    }
+  }
+
+  Future<void> _sendViaHttp(DeviceSession session, String content) async {
+    try {
+      final body = jsonEncode({
+        'content': content,
+        'sessionId': 'mobile_main',
+      });
+      final headers = _hmacService.buildAuthHeaders(
+        method: 'POST',
+        path: '/api/chat',
+        sessionToken: session.sessionToken,
+        hmacSecret: session.hmacSecret,
+        body: body,
+      );
+
+      final uri = Uri.parse('${session.httpBaseUrl}/api/chat');
+      final response = await _httpClient.post(
+        uri,
+        headers: headers,
+        body: body,
+      ).timeout(const Duration(seconds: 45));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        final asstContent = data['content'] as String?;
+        final messageId = data['messageId'] as String? ?? 'msg_asst_${DateTime.now().millisecondsSinceEpoch}';
+
+        if (asstContent != null && asstContent.isNotEmpty) {
+          final index = _messages.indexWhere((m) => m.id == messageId);
+          if (index != -1) {
+            _messages[index] = _messages[index].copyWith(
+              content: asstContent,
+              isStreaming: false,
+              progressPercent: 1.0,
+              stage: SubagentStage.completed,
+            );
+          } else {
+            _messages.add(ChatMessage(
+              id: messageId,
+              role: MessageRole.assistant,
+              content: asstContent,
+              timestamp: DateTime.now(),
+              isStreaming: false,
+              stage: SubagentStage.completed,
+            ));
+          }
+          _isStreaming = false;
+          _subagentProgress = 1.0;
+          _subagentLabel = 'Completed';
+          _triggerAiCompletion(data);
+          notifyListeners();
+        }
+      } else {
+        _handleMessageError({
+          'error': 'Server responded with status ${response.statusCode}',
+        });
+      }
+    } catch (e) {
+      if (_isStreaming) {
+        _handleMessageError({
+          'error': 'Could not reach Desktop Hub: $e. Ensure both devices are on the same Wi-Fi network.',
+        });
+      }
+    }
+  }
+
+  Future<void> loadSessionHistory() async {
+    final session = _connectionProvider.session;
+    if (session == null) return;
+    try {
+      final uri = Uri.parse('${session.httpBaseUrl}/api/sessions/mobile_main');
+      final res = await _httpClient.get(uri).timeout(const Duration(seconds: 4));
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body) as Map<String, dynamic>;
+        final rawMsgs = data['messages'] as List<dynamic>? ?? [];
+        if (rawMsgs.isNotEmpty && _messages.isEmpty) {
+          for (final rm in rawMsgs) {
+            if (rm is Map<String, dynamic>) {
+              final roleStr = rm['role'] as String? ?? 'user';
+              final content = rm['content'] as String? ?? '';
+              if (content.trim().isNotEmpty) {
+                _messages.add(ChatMessage(
+                  id: rm['id'] as String? ?? 'hist_${DateTime.now().millisecondsSinceEpoch}',
+                  role: roleStr == 'user' ? MessageRole.user : MessageRole.assistant,
+                  content: content,
+                  timestamp: DateTime.tryParse(rm['timestamp'] as String? ?? '') ?? DateTime.now(),
+                  isStreaming: false,
+                  stage: SubagentStage.completed,
+                ));
+              }
+            }
+          }
+          notifyListeners();
+        }
+      }
+    } catch (_) {}
   }
 
   void sendApprovalResponse(String approvalId, bool approved) {
@@ -383,6 +593,8 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _connectionProvider.removeListener(_onConnectionChanged);
+    _httpClient.close();
     _eventSubscription?.cancel();
     _tts.stop().catchError((_) {});
     super.dispose();

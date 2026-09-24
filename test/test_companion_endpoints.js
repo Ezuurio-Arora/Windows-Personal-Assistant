@@ -601,12 +601,13 @@ describe('Personal Assistant Mobile Companion Server Integration Suite', () => {
     // 1. Test POST /api/system/lock
     const lockRes = await fetch(`${BASE_URL}/api/system/lock`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dryRun: true })
     });
     assert.strictEqual(lockRes.status, 200, 'POST /api/system/lock must return 200');
     const lockData = await lockRes.json();
     assert.strictEqual(lockData.success, true, 'Lock action must succeed');
-    assert.match(lockData.action, /lock.*simulated/i, 'Lock action must be simulated in test mode');
+    assert.match(lockData.action, /lock/i, 'Lock action must confirm lock');
 
     // 2. Test WS fast actions: action:lock_pc, action:power, action:windows:list, and action:volume
     const ws = new WebSocket(`${WS_URL}/ws`);

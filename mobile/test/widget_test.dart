@@ -148,11 +148,8 @@ void main() {
       ),
     );
 
-    // 1. Verify Top App Bar elements
-    expect(find.descendant(of: find.byType(AppBar), matching: find.text('Personal Assistant')), findsOneWidget);
-    expect(find.descendant(of: find.byType(AppBar), matching: find.byIcon(Icons.auto_awesome)), findsOneWidget);
-    expect(find.byType(KillswitchButton), findsOneWidget);
-    expect(find.byType(GeminiGradientBar), findsOneWidget);
+    // 1. Verify Top App Bar is removed (clean edge-to-edge AMOLED)
+    expect(find.byType(AppBar), findsNothing);
 
     // 2. Verify Initial Screen is ChatScreen
     expect(find.byType(ChatScreen), findsOneWidget);
@@ -178,19 +175,24 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.byType(SettingsScreen), findsOneWidget);
 
-    // 7. Switch back to Chat
-    await tester.tap(find.text('Chat'));
+    // 7. Test Lock PC Dialog in Settings
+    final lockBtnFinder = find.byKey(const Key('killswitch_btn'));
+    await tester.scrollUntilVisible(lockBtnFinder, 250);
     await tester.pump(const Duration(milliseconds: 300));
-    expect(find.byType(ChatScreen), findsOneWidget);
-
-    // 8. Test Lock PC Dialog
-    await tester.tap(find.byKey(const Key('killswitch_btn')));
+    await tester.tap(lockBtnFinder);
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.text('Lock Workstation?'), findsWidgets);
     expect(find.widgetWithText(ElevatedButton, 'Lock PC'), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    // 8. Switch back to Chat
+    await tester.tap(find.text('Chat'));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.byType(ChatScreen), findsOneWidget);
   });
 
-  testWidgets('MainShell AppBar never overflows on small/compact mobile screen widths',
+  testWidgets('MainShell renders cleanly without top bar on compact mobile screen widths',
       (WidgetTester tester) async {
     final mockAuth = MockAuthService();
     final mockHmac = MockHmacService();
@@ -229,10 +231,9 @@ void main() {
         ),
       );
 
-      // Verify that no RenderFlex overflow error was triggered
+      // Verify that no RenderFlex overflow error was triggered and no AppBar is present
       expect(tester.takeException(), isNull);
-      expect(find.descendant(of: find.byType(AppBar), matching: find.text('Personal Assistant')), findsOneWidget);
-      expect(find.byType(KillswitchButton), findsOneWidget);
+      expect(find.byType(AppBar), findsNothing);
     }
   });
 }

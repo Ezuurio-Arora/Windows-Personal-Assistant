@@ -247,62 +247,21 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
 
     return Scaffold(
       backgroundColor: GeminiColors.canvas,
-      appBar: AppBar(
-        backgroundColor: GeminiColors.surfaceContainer,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        titleSpacing: 16,
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
+      body: SafeArea(
+        top: true,
+        bottom: false,
+        child: Column(
           children: [
-            Container(
-              padding: const EdgeInsets.all(5),
-              decoration: BoxDecoration(
-                color: GeminiColors.primary.withOpacity(0.12),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.auto_awesome,
-                color: GeminiColors.primary,
-                size: 18,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Flexible(
-              child: Text(
-                'Personal Assistant',
-                overflow: TextOverflow.ellipsis,
-                maxLines: 1,
-                softWrap: false,
-                style: titleStyle,
+            if (showUpdateBanner && updateProvider != null)
+              _buildUpdateBanner(context, updateProvider),
+            Expanded(
+              child: IndexedStack(
+                index: _currentIndex,
+                children: screens,
               ),
             ),
           ],
         ),
-        actions: [
-          _buildStatusPill(context, effectiveConnected, effectiveHostName, conn),
-          const SizedBox(width: 8),
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: KillswitchButton(onTriggered: widget.onEmergencyKillswitch),
-          ),
-        ],
-        bottom: const PreferredSize(
-          preferredSize: Size.fromHeight(3),
-          child: GeminiGradientBar(value: 1.0, height: 3),
-        ),
-      ),
-      body: Column(
-        children: [
-          if (showUpdateBanner && updateProvider != null)
-            _buildUpdateBanner(context, updateProvider),
-          Expanded(
-            child: IndexedStack(
-              index: _currentIndex,
-              children: screens,
-            ),
-          ),
-        ],
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(

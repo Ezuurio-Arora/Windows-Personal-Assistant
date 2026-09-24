@@ -291,6 +291,24 @@ app.post('/api/open-url', async (req, res) => {
   }
 });
 
+app.post('/api/chat', async (req, res) => {
+  const { content, sessionId, providerConfig } = req.body || {};
+  if (!content || typeof content !== 'string' || !content.trim()) {
+    return res.status(400).json({ error: 'Content is required' });
+  }
+  const targetSessionId = sessionId || 'mobile_main';
+  try {
+    const result = await handleChatMessage({
+      sessionId: targetSessionId,
+      content: content.trim(),
+      providerConfig
+    });
+    res.json({ success: true, sessionId: targetSessionId, ...result });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ----------------------------------------------------
 // APK Download & Auto-Update Endpoints
 // ----------------------------------------------------
@@ -780,7 +798,7 @@ app.post('/api/system/killswitch', async (req, res) => {
 });
 
 app.post('/api/system/lock', async (req, res) => {
-  const result = await fastActions.handlePowerAction({ action: 'lock' });
+  const result = await fastActions.handlePowerAction({ action: 'lock', ...req.body });
   res.json(result);
 });
 
@@ -1291,13 +1309,37 @@ async function handleChatMessage({ sessionId, content, providerConfig }) {
       content: currentText,
       steps: recordedSteps
     });
+
+    return {
+      messageId: assistantMsg.id,
+      content: currentText,
+      steps: recordedSteps
+    };
   } catch (err) {
     console.error('[Agent] Execution error:', err);
 
     const lowerContent = (content || '').toLowerCase().trim();
     let fallbackText = '';
 
-    if (lowerContent.match(/^(hello|hi|hey|greetings|who are you|help|start)\b/i)) {
+    // Direct Intent Fallback if model runner is offline
+    const detectedActions = detectActionIntent(content);
+    if (detectedActions && detectedActions.length > 0) {
+      try {
+        console.log('[Agent] Executing direct fallback actions:', detectedActions.map(a => a.name));
+        const workerResults = await agent.executeSubagentWorkers(detectedActions);
+        let summary = `### ✅ Action Executed (Direct Windows Host)\n\n`;
+        for (const wr of workerResults) {
+          const statusIcon = wr.result?.error ? '⚠️' : '✔️';
+          const msg = wr.result?.message || wr.result?.stdout || (wr.result?.error ? wr.result.error : 'Executed successfully');
+          summary += `* ${statusIcon} **${wr.name}**: ${msg}\n`;
+        }
+        fallbackText = summary.trim();
+      } catch (actErr) {
+        console.warn('[Agent] Fallback direct action failed:', actErr);
+      }
+    }
+
+    if (!fallbackText && lowerContent.match(/^(hello|hi|hey|greetings|who are you|help|start)\b/i)) {
       fallbackText =
         `👋 **Hello! I'm your Personal Assistant.**\n\n` +
         `I am running directly on your Windows PC (**${os.hostname()}**) with full system automation tools.\n\n` +
@@ -1310,7 +1352,7 @@ async function handleChatMessage({ sessionId, content, providerConfig }) {
         `3. **AnythingLLM**: Start AnythingLLM on port 3001.\n` +
         `4. **Cloud API**: Click the **Settings** gear icon in the sidebar to enter a Gemini or OpenAI API key.\n\n` +
         `*Tip: You can already test system automation directly! Try asking "check cpu", "take screenshot", or "top processes"!*`;
-    } else if (lowerContent.includes('cpu') || lowerContent.includes('ram') || lowerContent.includes('memory') || lowerContent.includes('hardware')) {
+    } else if (!fallbackText && (lowerContent.includes('cpu') || lowerContent.includes('ram') || lowerContent.includes('memory') || lowerContent.includes('hardware'))) {
       try {
         const metrics = await agent.executeTool('get_system_metrics', {});
         fallbackText =
@@ -1320,7 +1362,7 @@ async function handleChatMessage({ sessionId, content, providerConfig }) {
           `• **Uptime**: ${metrics.UptimeHours || 0} hours\n\n` +
           `*(Retrieved directly via Windows system tools while local model runner is offline)*`;
       } catch {}
-    } else if (lowerContent.includes('screenshot') || lowerContent.includes('screen')) {
+    } else if (!fallbackText && (lowerContent.includes('screenshot') || lowerContent.includes('screen'))) {
       try {
         const shot = await agent.executeTool('capture_screen', { quality: 75 });
         if (shot.dataUrl) {
@@ -1377,6 +1419,13 @@ async function handleChatMessage({ sessionId, content, providerConfig }) {
       error: err.message,
       content: currentText
     });
+
+    return {
+      messageId: assistantMsg.id,
+      content: currentText,
+      steps: recordedSteps,
+      error: err.message
+    };
   }
 }
 

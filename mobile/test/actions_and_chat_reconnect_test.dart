@@ -374,8 +374,8 @@ void main() {
     });
   });
 
-  group('MainShell Status Pill states', () {
-    testWidgets('Renders Online when connected', (tester) async {
+  group('MainShell Clean AMOLED Edge-to-Edge Design', () {
+    testWidgets('Renders MainShell without top AppBar when connected', (tester) async {
       final mockAuth = MockAuthService();
       final mockHmac = MockHmacService();
       final mockSocket = MockSocketService();
@@ -410,10 +410,10 @@ void main() {
         ),
       );
 
-      expect(find.text('Online'), findsOneWidget);
+      expect(find.byType(AppBar), findsNothing);
     });
 
-    testWidgets('Renders Pair when unpaired', (tester) async {
+    testWidgets('Renders MainShell without top AppBar when offline', (tester) async {
       final mockAuth = MockAuthService();
       final mockHmac = MockHmacService();
       final mockSocket = MockSocketService();
@@ -447,7 +447,7 @@ void main() {
         ),
       );
 
-      expect(find.text('Pair'), findsOneWidget);
+      expect(find.byType(AppBar), findsNothing);
     });
   });
 }
