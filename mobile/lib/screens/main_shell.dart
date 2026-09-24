@@ -390,37 +390,121 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     String hostName,
     ConnectionProvider? conn,
   ) {
-    final dotColor = connected ? GeminiColors.success : GeminiColors.emergencyDanger;
-    final statusText = connected ? 'Online' : 'Pair';
+    final Color dotColor;
+    final String statusText;
+    final VoidCallback onTap;
+
+    if (connected) {
+      dotColor = GeminiColors.success;
+      statusText = 'Online';
+      onTap = () {
+        HapticFeedback.lightImpact();
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Connected to $hostName via ${conn?.activeTransport ?? "LAN"}',
+              style: const TextStyle(color: GeminiColors.textBody, fontSize: 13),
+            ),
+            backgroundColor: GeminiColors.surfaceContainer,
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: const BorderSide(color: GeminiColors.border),
+            ),
+          ),
+        );
+      };
+    } else if (conn?.status == ConnectionStatus.connecting) {
+      dotColor = GeminiColors.warning;
+      statusText = 'Connecting...';
+      onTap = () {
+        HapticFeedback.lightImpact();
+        conn?.retryConnection();
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Connecting to $hostName...',
+              style: const TextStyle(color: GeminiColors.textBody, fontSize: 13),
+            ),
+            backgroundColor: GeminiColors.surfaceContainer,
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: const BorderSide(color: GeminiColors.border),
+            ),
+          ),
+        );
+      };
+    } else if (conn?.status == ConnectionStatus.reconnecting) {
+      dotColor = GeminiColors.warning;
+      statusText = 'Reconnecting...';
+      onTap = () {
+        HapticFeedback.lightImpact();
+        conn?.retryConnection();
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Reconnecting to $hostName...',
+              style: const TextStyle(color: GeminiColors.textBody, fontSize: 13),
+            ),
+            backgroundColor: GeminiColors.surfaceContainer,
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: const BorderSide(color: GeminiColors.border),
+            ),
+          ),
+        );
+      };
+    } else if (conn?.session != null) {
+      dotColor = GeminiColors.warning;
+      statusText = 'PC Offline';
+      onTap = () {
+        HapticFeedback.lightImpact();
+        conn?.retryConnection();
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Attempting reconnection to $hostName...',
+              style: const TextStyle(color: GeminiColors.textBody, fontSize: 13),
+            ),
+            backgroundColor: GeminiColors.surfaceContainer,
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: const BorderSide(color: GeminiColors.border),
+            ),
+          ),
+        );
+      };
+    } else {
+      dotColor = GeminiColors.emergencyDanger;
+      statusText = 'Pair';
+      onTap = () {
+        HapticFeedback.lightImpact();
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const ScanScreen()),
+        );
+      };
+    }
+
+    final isWarningState = !connected &&
+        (conn?.status == ConnectionStatus.connecting ||
+            conn?.status == ConnectionStatus.reconnecting ||
+            conn?.session != null);
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: () {
-          HapticFeedback.lightImpact();
-          if (!connected) {
-            Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const ScanScreen()),
-            );
-          } else {
-            ScaffoldMessenger.of(context).hideCurrentSnackBar();
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  'Connected to $hostName via ${conn?.activeTransport ?? "LAN"}',
-                  style: const TextStyle(color: GeminiColors.textBody, fontSize: 13),
-                ),
-                backgroundColor: GeminiColors.surfaceContainer,
-                duration: const Duration(seconds: 2),
-                behavior: SnackBarBehavior.floating,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  side: const BorderSide(color: GeminiColors.border),
-                ),
-              ),
-            );
-          }
-        },
+        onTap: onTap,
         borderRadius: BorderRadius.circular(16),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
@@ -430,7 +514,9 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
             border: Border.all(
               color: connected
                   ? GeminiColors.success.withOpacity(0.35)
-                  : GeminiColors.border,
+                  : isWarningState
+                      ? GeminiColors.warning.withOpacity(0.35)
+                      : GeminiColors.border,
               width: 1,
             ),
           ),
@@ -451,14 +537,26 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                             spreadRadius: 1,
                           ),
                         ]
-                      : null,
+                      : isWarningState
+                          ? [
+                              BoxShadow(
+                                color: GeminiColors.warning.withOpacity(0.5),
+                                blurRadius: 4,
+                                spreadRadius: 1,
+                              ),
+                            ]
+                          : null,
                 ),
               ),
               const SizedBox(width: 5),
               Text(
                 statusText,
                 style: TextStyle(
-                  color: connected ? GeminiColors.textBody : GeminiColors.textSecondary,
+                  color: connected
+                      ? GeminiColors.textBody
+                      : isWarningState
+                          ? GeminiColors.warning
+                          : GeminiColors.textSecondary,
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
                   letterSpacing: 0.1,

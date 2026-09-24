@@ -51,20 +51,37 @@ class ActionsProvider extends ChangeNotifier {
         notifyListeners();
         break;
       case 'volume:state':
+      case 'volume:update':
         _volumeLevel = (data['level'] as num?)?.toInt() ?? _volumeLevel;
         _isMuted = data['muted'] as bool? ?? _isMuted;
         notifyListeners();
         break;
       case 'windows:list':
+      case 'windows:update':
         final parsed = WindowListResponse.fromJson(data);
         _windows = parsed.windows;
         _activeWindow = parsed.activeWindow;
         notifyListeners();
         break;
       case 'timer:state':
+      case 'timer:update':
       case 'timer:completed':
       case 'timer:cancelled':
         _handleTimerEvent(data);
+        break;
+      case 'power:update':
+        if (data['battery'] != null && data['battery'] is Map<String, dynamic>) {
+          _metrics = SystemMetrics(
+            hostName: _metrics.hostName,
+            cpu: _metrics.cpu,
+            memory: _metrics.memory,
+            gpu: _metrics.gpu,
+            battery: BatteryMetrics.fromJson(data['battery'] as Map<String, dynamic>),
+            uptimeHours: _metrics.uptimeHours,
+            timestamp: DateTime.now(),
+          );
+        }
+        notifyListeners();
         break;
     }
   }
@@ -114,6 +131,27 @@ class ActionsProvider extends ChangeNotifier {
 
   void focusWindow(String targetOrHwnd) {
     _dispatch('action:windows:focus', {'target': targetOrHwnd});
+  }
+
+  Future<void> lockPc() async {
+    final session = _connectionProvider.session;
+    if (session == null) return;
+
+    // Dual-Path Dispatch: WebSocket frame + concurrent HTTP request for resilience
+    _dispatch('action:lock_pc', {'action': 'lock'});
+
+    try {
+      final headers = _hmacService.buildAuthHeaders(
+        method: 'POST',
+        path: '/api/system/lock',
+        sessionToken: session.sessionToken,
+        hmacSecret: session.hmacSecret,
+      );
+      await _httpClient.post(
+        Uri.parse('${session.httpBaseUrl}/api/system/lock'),
+        headers: headers,
+      ).timeout(const Duration(seconds: 2));
+    } catch (_) {}
   }
 
   Future<void> triggerEmergencyKillswitch() async {

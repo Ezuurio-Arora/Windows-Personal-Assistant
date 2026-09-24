@@ -335,9 +335,25 @@ export class StorageService {
     return (this.data.sessions || []).find((s) => s.id === id) || null;
   }
 
-  createSession(title = 'New Conversation') {
+  getOrCreateSession(id, title = 'Personal Assistant Session') {
+    const existing = this.getSession(id);
+    if (existing) return existing;
     const session = {
-      id: `sess_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+      id,
+      title,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      messages: []
+    };
+    if (!this.data.sessions) this.data.sessions = [];
+    this.data.sessions.unshift(session);
+    this.save();
+    return session;
+  }
+
+  createSession(title = 'New Conversation', customId = null) {
+    const session = {
+      id: customId || `sess_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
       title,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),

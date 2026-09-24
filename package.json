@@ -10,7 +10,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "start:hub": "node server/index.js",
-    "start:app": "electron ."
+    "start:app": "electron .",
+    "test": "node --test test/test_companion_endpoints.js test/test_storage_service.js"
   },
   "dependencies": {
     "clsx": "^2.1.1",

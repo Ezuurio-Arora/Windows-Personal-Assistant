@@ -19,12 +19,12 @@ class DeviceSession {
     required this.lanIp,
     required this.port,
     this.tunnelUrl,
-    required this.safetyMode,
-    required this.serverTime,
+    this.safetyMode = 'tiered',
+    this.serverTime = 0,
     required this.pairedAt,
     required this.lastConnected,
-    required this.deviceId,
-    required this.deviceName,
+    this.deviceId = 'android_device',
+    this.deviceName = 'Android Companion',
   });
 
   String get hostIp => lanIp;

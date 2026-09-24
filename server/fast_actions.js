@@ -106,6 +106,8 @@ export class FastActionDispatcher {
       'action:volume',
       'action:windows:list',
       'action:windows:focus',
+      'action:lock_pc',
+      'action:power',
       'action:killswitch',
       'system:killswitch'
     ];
@@ -217,6 +219,11 @@ export class FastActionDispatcher {
 
         case 'action:windows:focus':
           result = await this.handleWindowsFocus(data);
+          break;
+
+        case 'action:lock_pc':
+        case 'action:power':
+          result = await this.handlePowerAction(data);
           break;
 
         case 'action:killswitch':
@@ -585,6 +592,7 @@ export class FastActionDispatcher {
         message: this.isMuted ? 'Volume muted' : 'Volume unmuted'
       };
       this.broadcast('volume:state', response);
+      this.broadcast('volume:update', response);
 
       if (process.env.TEST_MODE !== '1') {
         this._scheduleMuteSync();
@@ -619,6 +627,7 @@ export class FastActionDispatcher {
       message: `Volume set to ${level}%`
     };
     this.broadcast('volume:state', response);
+    this.broadcast('volume:update', response);
 
     if (process.env.TEST_MODE !== '1') {
       this._scheduleVolumeSync(level);
@@ -716,10 +725,12 @@ export class FastActionDispatcher {
 
   handleWindowsList() {
     // Return cached windows immediately (<0.05ms)
-    return {
+    const result = {
       activeWindow: this.cachedActiveWindow || null,
       windows: this.cachedWindows || []
     };
+    this.broadcast('windows:list', result);
+    return result;
   }
 
   async handleWindowsFocus(data) {
@@ -736,6 +747,24 @@ export class FastActionDispatcher {
     };
     this.broadcast('windows:focused', payload);
     return payload;
+  }
+
+  // --------------------------------------------------------------------------
+  // Power & Workstation Actions (<35ms)
+  // --------------------------------------------------------------------------
+
+  async handlePowerAction(data = {}) {
+    const action = data.action || 'lock';
+    const isTest = process.env.TEST_MODE === '1' || process.env.NODE_ENV === 'test' || data.dryRun === true;
+    let res;
+    if (isTest) {
+      res = { success: true, action: `${action} (simulated)` };
+    } else {
+      res = await powerAction(action);
+    }
+    // CRITICAL: DO NOT revoke device or session here! Keep pairedDevice intact!
+    this.broadcast('power:update', res);
+    return res;
   }
 
   // --------------------------------------------------------------------------

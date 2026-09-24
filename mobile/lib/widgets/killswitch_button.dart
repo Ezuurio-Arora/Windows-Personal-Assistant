@@ -34,21 +34,21 @@ class _KillswitchButtonState extends State<KillswitchButton> {
             _confirmKillswitch(context);
           },
           borderRadius: BorderRadius.circular(16),
-          splashColor: GeminiColors.emergencyDanger.withOpacity(0.2),
-          highlightColor: GeminiColors.emergencyDanger.withOpacity(0.1),
+          splashColor: GeminiColors.primary.withOpacity(0.2),
+          highlightColor: GeminiColors.primary.withOpacity(0.1),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
               color: GeminiColors.elevatedCard,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: GeminiColors.emergencyDanger.withOpacity(0.4),
+                color: GeminiColors.border,
                 width: 1,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: GeminiColors.emergencyDanger.withOpacity(0.12),
-                  blurRadius: 8,
+                  color: Colors.black.withOpacity(0.2),
+                  blurRadius: 6,
                   spreadRadius: 0,
                 ),
               ],
@@ -57,15 +57,15 @@ class _KillswitchButtonState extends State<KillswitchButton> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(
-                  Icons.lock_rounded,
+                  Icons.lock_outline_rounded,
                   size: 13,
-                  color: GeminiColors.emergencyDanger,
+                  color: GeminiColors.textHeading,
                 ),
                 SizedBox(width: 5),
                 Text(
-                  'Lock',
+                  'Lock PC',
                   style: TextStyle(
-                    color: GeminiColors.emergencyDanger,
+                    color: GeminiColors.textHeading,
                     fontWeight: FontWeight.w600,
                     fontSize: 11,
                     letterSpacing: 0.1,
@@ -80,11 +80,6 @@ class _KillswitchButtonState extends State<KillswitchButton> {
   }
 
   void _confirmKillswitch(BuildContext context) {
-    if (widget.onTriggered != null) {
-      widget.onTriggered!();
-      return;
-    }
-
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -95,21 +90,32 @@ class _KillswitchButtonState extends State<KillswitchButton> {
         ),
         title: const Row(
           children: [
-            Icon(Icons.warning_amber_rounded, color: GeminiColors.emergencyDanger, size: 22),
+            Icon(Icons.lock_outline_rounded, color: GeminiColors.primary, size: 22),
             SizedBox(width: 8),
             Text(
-              'Emergency Killswitch',
+              'Lock Workstation?',
               style: TextStyle(
-                color: GeminiColors.emergencyDanger,
+                color: GeminiColors.textHeading,
                 fontWeight: FontWeight.bold,
                 fontSize: 18,
               ),
             ),
           ],
         ),
-        content: const Text(
-          'This will immediately lock your Windows desktop and revoke this mobile session. Proceed?',
-          style: TextStyle(color: GeminiColors.textBody, fontSize: 14, height: 1.4),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Lock Workstation? This will immediately lock your Windows desktop. Your mobile connection will remain paired.',
+              style: TextStyle(color: GeminiColors.textBody, fontSize: 14, height: 1.4),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Need to emergency unpair? Go to Settings → Unpair Device.',
+              style: TextStyle(color: GeminiColors.textSecondary.withOpacity(0.85), fontSize: 12, height: 1.3),
+            ),
+          ],
         ),
         actions: [
           TextButton(
@@ -126,19 +132,23 @@ class _KillswitchButtonState extends State<KillswitchButton> {
             onPressed: () {
               HapticFeedback.lightImpact();
               Navigator.of(ctx).pop();
-              try {
-                context.read<ActionsProvider>().triggerEmergencyKillswitch();
-              } catch (_) {}
+              if (widget.onTriggered != null) {
+                widget.onTriggered!();
+              } else {
+                try {
+                  context.read<ActionsProvider>().lockPc();
+                } catch (_) {}
+              }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: GeminiColors.emergencyDanger,
-              foregroundColor: Colors.white,
+              backgroundColor: GeminiColors.primary,
+              foregroundColor: GeminiColors.canvas,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
               elevation: 0,
             ),
             child: const Text(
-              'Lock Workstation Now',
+              'Lock PC',
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
             ),
           ),

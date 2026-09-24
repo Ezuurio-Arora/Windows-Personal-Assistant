@@ -101,6 +101,7 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
       case 'agent:complete':
       case 'chat:complete':
       case 'message:complete':
+      case 'message:completed':
         _handleAgentComplete(data);
         break;
       case 'step:completed':
@@ -109,7 +110,54 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
       case 'approval:required':
         _handleApprovalRequired(data);
         break;
+      case 'message:error':
+        _handleMessageError(data);
+        break;
     }
+  }
+
+  void _handleMessageError(Map<String, dynamic> data) {
+    _isStreaming = false;
+    final messageId = data['messageId'] as String? ?? _activeMessageId;
+    final errorText = data['error'] as String? ?? data['message'] as String? ?? 'An error occurred processing your request.';
+
+    if (messageId != null) {
+      final index = _messages.indexWhere((m) => m.id == messageId);
+      if (index != -1) {
+        final old = _messages[index];
+        _messages[index] = old.copyWith(
+          content: old.content.isEmpty ? 'Error: $errorText' : '${old.content}\n\n[Error: $errorText]',
+          isStreaming: false,
+          stage: SubagentStage.completed,
+        );
+      } else {
+        _messages.add(ChatMessage(
+          id: messageId,
+          role: MessageRole.assistant,
+          content: 'Error: $errorText',
+          timestamp: DateTime.now(),
+          isStreaming: false,
+          stage: SubagentStage.completed,
+        ));
+      }
+    } else if (_messages.isNotEmpty && _messages.last.role == MessageRole.assistant) {
+      final last = _messages.last;
+      _messages[_messages.length - 1] = last.copyWith(
+        content: last.content.isEmpty ? 'Error: $errorText' : '${last.content}\n\n[Error: $errorText]',
+        isStreaming: false,
+        stage: SubagentStage.completed,
+      );
+    } else {
+      _messages.add(ChatMessage(
+        id: 'msg_err_${DateTime.now().millisecondsSinceEpoch}',
+        role: MessageRole.assistant,
+        content: 'Error: $errorText',
+        timestamp: DateTime.now(),
+        isStreaming: false,
+        stage: SubagentStage.completed,
+      ));
+    }
+    notifyListeners();
   }
 
   void _handleToken(Map<String, dynamic> data) {

@@ -593,4 +593,85 @@ describe('Personal Assistant Mobile Companion Server Integration Suite', () => {
     assert.match(String(freshQr.pin), /^\d{6}$/, 'Fresh 6-digit PIN must be generated');
     assert.notStrictEqual(freshQr.nonce, qrData.nonce, 'New nonce must differ from previous');
   });
+
+  // ----------------------------------------------------
+  // TEST 8: System lock, power actions, windows list, and dual volume updates
+  // ----------------------------------------------------
+  test('Test 8: System lock endpoint, power actions, and dual updates', async () => {
+    // 1. Test POST /api/system/lock
+    const lockRes = await fetch(`${BASE_URL}/api/system/lock`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    assert.strictEqual(lockRes.status, 200, 'POST /api/system/lock must return 200');
+    const lockData = await lockRes.json();
+    assert.strictEqual(lockData.success, true, 'Lock action must succeed');
+    assert.match(lockData.action, /lock.*simulated/i, 'Lock action must be simulated in test mode');
+
+    // 2. Test WS fast actions: action:lock_pc, action:power, action:windows:list, and action:volume
+    const ws = new WebSocket(`${WS_URL}/ws`);
+    await new Promise((resolve) => ws.on('open', resolve));
+
+    const receivedEvents = [];
+    ws.on('message', (raw) => {
+      try {
+        const parsed = JSON.parse(raw.toString());
+        receivedEvents.push(parsed);
+      } catch {}
+    });
+
+    // Test action:lock_pc
+    ws.send(JSON.stringify({
+      event: 'action:lock_pc',
+      data: { dryRun: true }
+    }));
+
+    await new Promise((r) => setTimeout(r, 200));
+    assert.ok(
+      receivedEvents.some((e) => e.event === 'power:update' || e.event === 'lock_pc:update'),
+      'action:lock_pc must receive power:update or lock_pc:update'
+    );
+
+    // Test action:power
+    ws.send(JSON.stringify({
+      event: 'action:power',
+      data: { action: 'lock', dryRun: true }
+    }));
+
+    await new Promise((r) => setTimeout(r, 200));
+    assert.ok(
+      receivedEvents.some((e) => e.event === 'power:update'),
+      'action:power must receive power:update'
+    );
+
+    // Test action:windows:list
+    ws.send(JSON.stringify({
+      event: 'action:windows:list',
+      data: {}
+    }));
+
+    await new Promise((r) => setTimeout(r, 200));
+    assert.ok(
+      receivedEvents.some((e) => e.event === 'windows:list'),
+      'action:windows:list must receive windows:list event'
+    );
+
+    // Test action:volume dual update
+    ws.send(JSON.stringify({
+      event: 'action:volume',
+      data: { action: 'set', level: 50 }
+    }));
+
+    await new Promise((r) => setTimeout(r, 200));
+    assert.ok(
+      receivedEvents.some((e) => e.event === 'volume:state'),
+      'action:volume must receive volume:state'
+    );
+    assert.ok(
+      receivedEvents.some((e) => e.event === 'volume:update'),
+      'action:volume must receive volume:update'
+    );
+
+    ws.close();
+  });
 });

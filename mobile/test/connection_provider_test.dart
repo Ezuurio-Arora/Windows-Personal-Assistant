@@ -79,6 +79,8 @@ class MockSocketService implements SocketService {
   final _binController = StreamController<Uint8List>.broadcast();
   final _connController = StreamController<bool>.broadcast();
   bool connected = false;
+  bool shouldFailConnect = false;
+  int connectCount = 0;
 
   @override
   Stream<Uint8List> get binaryStream => _binController.stream;
@@ -90,6 +92,10 @@ class MockSocketService implements SocketService {
   bool get isConnected => connected;
   @override
   Future<void> connect({required String url}) async {
+    connectCount++;
+    if (shouldFailConnect) {
+      throw Exception('Socket connection failed');
+    }
     connected = true;
     _connController.add(true);
   }
@@ -356,6 +362,157 @@ void main() {
 
       provider.setTargetHostIp('192.168.1.200');
       expect(provider.targetHostIp, equals('192.168.1.200'));
+    });
+
+    test('Persistent pairing: connection drop sets status to reconnecting without clearing session', () async {
+      final session = DeviceSession(
+        sessionToken: 'test_token_123',
+        hmacSecret: 'test_secret_456',
+        hostName: 'TEST-HOST',
+        lanIp: '192.168.10.139',
+        port: 42000,
+        pairedAt: DateTime.now(),
+        lastConnected: DateTime.now(),
+      );
+      mockAuth.savedSession = session;
+
+      final provider = ConnectionProvider(
+        authService: mockAuth,
+        hmacService: mockHmac,
+        socketService: mockSocket,
+      );
+      await Future.delayed(const Duration(milliseconds: 10));
+
+      expect(provider.isConnected, isTrue);
+      expect(provider.status, equals(ConnectionStatus.connected));
+      expect(provider.session, isNotNull);
+
+      // Simulate network / server drop
+      await mockSocket.disconnect();
+      await Future.delayed(const Duration(milliseconds: 10));
+
+      expect(provider.isConnected, isFalse);
+      expect(provider.status, equals(ConnectionStatus.reconnecting));
+      expect(provider.session, isNotNull, reason: 'Session must NOT be cleared on drop');
+      expect(mockAuth.savedSession, isNotNull, reason: 'Session must remain stored in authService');
+
+      provider.dispose();
+    });
+
+    test('connectWithSession sets reconnecting on failure and retryConnection triggers reconnect', () async {
+      final session = DeviceSession(
+        sessionToken: 'test_token_fail',
+        hmacSecret: 'test_secret_fail',
+        hostName: 'FAIL-HOST',
+        lanIp: '192.168.10.139',
+        port: 42000,
+        pairedAt: DateTime.now(),
+        lastConnected: DateTime.now(),
+      );
+      mockSocket.shouldFailConnect = true;
+
+      final provider = ConnectionProvider(
+        authService: mockAuth,
+        hmacService: mockHmac,
+        socketService: mockSocket,
+      );
+
+      await provider.connectWithSession(session);
+      expect(provider.status, equals(ConnectionStatus.reconnecting));
+      expect(provider.session, isNotNull);
+      expect(provider.errorMessage, contains('Could not reach desktop'));
+
+      // Now server comes back online
+      mockSocket.shouldFailConnect = false;
+      await provider.retryConnection();
+
+      expect(provider.status, equals(ConnectionStatus.connected));
+      expect(provider.isConnected, isTrue);
+
+      provider.dispose();
+    });
+
+    test('disconnect(userInitiated: false) does NOT clear session', () async {
+      final session = DeviceSession(
+        sessionToken: 'token_keep',
+        hmacSecret: 'secret_keep',
+        hostName: 'KEEP-HOST',
+        lanIp: '192.168.10.139',
+        port: 42000,
+        pairedAt: DateTime.now(),
+        lastConnected: DateTime.now(),
+      );
+      mockAuth.savedSession = session;
+
+      final provider = ConnectionProvider(
+        authService: mockAuth,
+        hmacService: mockHmac,
+        socketService: mockSocket,
+      );
+      await Future.delayed(const Duration(milliseconds: 10));
+
+      await provider.disconnect(userInitiated: false);
+      expect(provider.session, isNotNull);
+      expect(mockAuth.savedSession, isNotNull);
+      expect(provider.status, equals(ConnectionStatus.reconnecting));
+
+      provider.dispose();
+    });
+
+    test('disconnect(userInitiated: true) clears session and sets unpaired', () async {
+      final session = DeviceSession(
+        sessionToken: 'token_clear',
+        hmacSecret: 'secret_clear',
+        hostName: 'CLEAR-HOST',
+        lanIp: '192.168.10.139',
+        port: 42000,
+        pairedAt: DateTime.now(),
+        lastConnected: DateTime.now(),
+      );
+      mockAuth.savedSession = session;
+
+      final provider = ConnectionProvider(
+        authService: mockAuth,
+        hmacService: mockHmac,
+        socketService: mockSocket,
+      );
+      await Future.delayed(const Duration(milliseconds: 10));
+
+      await provider.disconnect(userInitiated: true);
+      expect(provider.session, isNull);
+      expect(mockAuth.savedSession, isNull);
+      expect(provider.status, equals(ConnectionStatus.unpaired));
+
+      provider.dispose();
+    });
+
+    test('handleRemoteRevocation clears session and sets revoked status', () async {
+      final session = DeviceSession(
+        sessionToken: 'token_revoke',
+        hmacSecret: 'secret_revoke',
+        hostName: 'REVOKE-HOST',
+        lanIp: '192.168.10.139',
+        port: 42000,
+        pairedAt: DateTime.now(),
+        lastConnected: DateTime.now(),
+      );
+      mockAuth.savedSession = session;
+
+      final provider = ConnectionProvider(
+        authService: mockAuth,
+        hmacService: mockHmac,
+        socketService: mockSocket,
+      );
+      await Future.delayed(const Duration(milliseconds: 10));
+
+      provider.handleRemoteRevocation();
+      await Future.delayed(const Duration(milliseconds: 10));
+
+      expect(provider.session, isNull);
+      expect(mockAuth.savedSession, isNull);
+      expect(provider.status, equals(ConnectionStatus.revoked));
+
+      provider.dispose();
     });
   });
 }

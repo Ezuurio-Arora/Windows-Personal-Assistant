@@ -34,6 +34,8 @@ class ConnectionProvider extends ChangeNotifier {
 
   StreamSubscription? _socketSub;
   StreamSubscription? _connectionSub;
+  Timer? _reconnectTimer;
+  bool _isConnecting = false;
 
   ConnectionProvider({
     required AuthService authService,
@@ -80,13 +82,48 @@ class ConnectionProvider extends ChangeNotifier {
     _connectionSub = _socketService.connectionStateStream.listen((connected) {
       if (connected) {
         _status = ConnectionStatus.connected;
-      } else if (_status == ConnectionStatus.connected) {
+        _errorMessage = null;
+        _stopReconnectLoop();
+      } else if (_session != null) {
         _status = ConnectionStatus.reconnecting;
+        _startReconnectLoop();
+      } else {
+        _status = ConnectionStatus.unpaired;
       }
       notifyListeners();
     });
 
     _socketSub = _socketService.eventStream.listen(_handleServerEvent);
+  }
+
+  void _startReconnectLoop() {
+    if (_reconnectTimer != null && _reconnectTimer!.isActive) return;
+    _reconnectTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+      if (_session != null && !isConnected) {
+        _status = ConnectionStatus.reconnecting;
+        notifyListeners();
+        _attemptReconnect();
+      } else {
+        _stopReconnectLoop();
+      }
+    });
+  }
+
+  void _stopReconnectLoop() {
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
+  }
+
+  Future<void> _attemptReconnect() async {
+    if (_session == null || isConnected || _isConnecting) return;
+    await connectWithSession(_session!);
+  }
+
+  Future<void> retryConnection() async {
+    if (_session == null || _isConnecting) return;
+    _status = ConnectionStatus.reconnecting;
+    notifyListeners();
+    await connectWithSession(_session!);
   }
 
   void _handleServerEvent(Map<String, dynamic> packet) {
@@ -459,27 +496,46 @@ class ConnectionProvider extends ChangeNotifier {
   }
 
   Future<void> connectWithSession(DeviceSession session) async {
+    if (_isConnecting) return;
+    _isConnecting = true;
+    _session = session;
+
     try {
       _activeTransport = 'LAN';
       await _socketService.connect(url: session.wsUrl);
       _status = ConnectionStatus.connected;
+      _errorMessage = null;
+      _stopReconnectLoop();
     } catch (_) {
       try {
         _activeTransport = 'mDNS';
         await _socketService.connect(url: session.fallbackWsUrl);
         _status = ConnectionStatus.connected;
+        _errorMessage = null;
+        _stopReconnectLoop();
       } catch (_) {
-        if (session.tunnelWsUrl != null) {
-          _activeTransport = 'Tunnel';
-          await _socketService.connect(url: session.tunnelWsUrl!);
-          _status = ConnectionStatus.connected;
+        if (session.tunnelWsUrl != null && session.tunnelWsUrl!.isNotEmpty) {
+          try {
+            _activeTransport = 'Tunnel';
+            await _socketService.connect(url: session.tunnelWsUrl!);
+            _status = ConnectionStatus.connected;
+            _errorMessage = null;
+            _stopReconnectLoop();
+          } catch (_) {
+            _status = ConnectionStatus.reconnecting;
+            _errorMessage = 'Could not reach desktop over LAN, mDNS, or Tunnel.';
+            _startReconnectLoop();
+          }
         } else {
-          _status = ConnectionStatus.error;
+          _status = ConnectionStatus.reconnecting;
           _errorMessage = 'Could not reach desktop over LAN, mDNS, or Tunnel.';
+          _startReconnectLoop();
         }
       }
+    } finally {
+      _isConnecting = false;
+      notifyListeners();
     }
-    notifyListeners();
   }
 
   Future<void> disconnect({bool userInitiated = true}) async {
@@ -499,13 +555,21 @@ class ConnectionProvider extends ChangeNotifier {
     }
 
     await _socketService.disconnect();
-    await _authService.clearSession();
-    _session = null;
-    _status = ConnectionStatus.unpaired;
+
+    if (userInitiated) {
+      _stopReconnectLoop();
+      await _authService.clearSession();
+      _session = null;
+      _status = ConnectionStatus.unpaired;
+    } else {
+      _status = ConnectionStatus.reconnecting;
+      _startReconnectLoop();
+    }
     notifyListeners();
   }
 
   void handleRemoteRevocation() async {
+    _stopReconnectLoop();
     await _socketService.disconnect(code: 4003, reason: 'Device Access Revoked');
     await _authService.clearSession();
     _session = null;
@@ -516,6 +580,7 @@ class ConnectionProvider extends ChangeNotifier {
 
   @override
   void dispose() {
+    _stopReconnectLoop();
     _socketSub?.cancel();
     _connectionSub?.cancel();
     _httpClient.close();

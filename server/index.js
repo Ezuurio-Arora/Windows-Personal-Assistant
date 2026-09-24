@@ -779,6 +779,11 @@ app.post('/api/system/killswitch', async (req, res) => {
   res.json(result);
 });
 
+app.post('/api/system/lock', async (req, res) => {
+  const result = await fastActions.handlePowerAction({ action: 'lock' });
+  res.json(result);
+});
+
 // Serve frontend SPA
 const distPath = path.resolve('dist');
 app.use(express.static(distPath));
@@ -897,6 +902,34 @@ wss.on('connection', (ws, req) => {
               data: result
             })
           );
+          ws.send(
+            JSON.stringify({
+              event: `${actionSuffix}:state`,
+              data: result
+            })
+          );
+          if (event === 'action:windows:list') {
+            ws.send(
+              JSON.stringify({
+                event: 'windows:list',
+                data: result
+              })
+            );
+          }
+          if (event === 'action:lock_pc' || event === 'action:power') {
+            ws.send(
+              JSON.stringify({
+                event: 'power:update',
+                data: result
+              })
+            );
+            ws.send(
+              JSON.stringify({
+                event: 'power:state',
+                data: result
+              })
+            );
+          }
         }
         return; // BYPASS ReAct loop entirely!
       }
@@ -949,18 +982,18 @@ wss.on('connection', (ws, req) => {
  * Handle a chat prompt through the ReAct agent loop with LLM and tools.
  */
 async function handleChatMessage({ sessionId, content, providerConfig }) {
-  const session = storage.getSession(sessionId);
-  if (!session) return;
+  const targetSessionId = sessionId || 'mobile_main';
+  const session = storage.getOrCreateSession(targetSessionId, 'Mobile Assistant Session');
 
-  const userMsg = storage.addMessage(sessionId, { role: 'user', content });
-  broadcast('message:created', { sessionId, message: userMsg });
+  const userMsg = storage.addMessage(targetSessionId, { role: 'user', content });
+  broadcast('message:created', { sessionId: targetSessionId, message: userMsg });
 
-  const assistantMsg = storage.addMessage(sessionId, {
+  const assistantMsg = storage.addMessage(targetSessionId, {
     role: 'assistant',
     content: '',
     steps: []
   });
-  broadcast('message:created', { sessionId, message: assistantMsg });
+  broadcast('message:created', { sessionId: targetSessionId, message: assistantMsg });
 
   const activeSettings = storage.getSettings();
   let cleanBaseUrl = (
@@ -1009,13 +1042,13 @@ async function handleChatMessage({ sessionId, content, providerConfig }) {
       let tokenCount = 0;
 
       broadcast('agent:thinking', {
-        sessionId,
+        sessionId: targetSessionId,
         messageId: assistantMsg.id,
         status: iterations === 1 ? 'thinking' : 'synthesizing'
       });
 
       broadcast('agent:progress', {
-        sessionId,
+        sessionId: targetSessionId,
         messageId: assistantMsg.id,
         stage: iterations === 1 ? 'evaluating' : 'synthesizing',
         percent: iterations === 1 ? 20 : 75,
@@ -1039,7 +1072,7 @@ async function handleChatMessage({ sessionId, content, providerConfig }) {
             const tokenEstimate = Math.round(fullReasoning.length / 4);
             const dynamicPercent = Math.min(65, 20 + Math.floor(tokenEstimate * 0.2));
             broadcast('agent:progress', {
-              sessionId,
+              sessionId: targetSessionId,
               messageId: assistantMsg.id,
               stage: iterations === 1 ? 'evaluating' : 'synthesizing',
               percent: dynamicPercent,
@@ -1054,7 +1087,7 @@ async function handleChatMessage({ sessionId, content, providerConfig }) {
           if (iterations > 1 || (!turnContent.includes('<response') && !turnContent.includes('<tool_call') && !turnContent.includes('<tools'))) {
             currentText += token;
             broadcast('message:token', {
-              sessionId,
+              sessionId: targetSessionId,
               messageId: assistantMsg.id,
               token,
               fullContent: currentText
@@ -1065,7 +1098,7 @@ async function handleChatMessage({ sessionId, content, providerConfig }) {
               const maxPercent = iterations === 1 ? 85 : 97;
               const dynamicPercent = Math.min(maxPercent, basePercent + Math.floor(tokenCount * 0.4));
               broadcast('agent:progress', {
-                sessionId,
+                sessionId: targetSessionId,
                 messageId: assistantMsg.id,
                 stage: iterations === 1 ? 'generating' : 'synthesizing',
                 percent: dynamicPercent,
@@ -1097,14 +1130,14 @@ async function handleChatMessage({ sessionId, content, providerConfig }) {
       if (iterations === 1 && effectiveToolCalls.length > 0) {
         currentText = '';
         broadcast('message:token', {
-          sessionId,
+          sessionId: targetSessionId,
           messageId: assistantMsg.id,
           token: '',
           fullContent: ''
         });
 
         broadcast('agent:progress', {
-          sessionId,
+          sessionId: targetSessionId,
           messageId: assistantMsg.id,
           stage: 'subagent_execution',
           percent: 45,
@@ -1115,7 +1148,7 @@ async function handleChatMessage({ sessionId, content, providerConfig }) {
           effectiveToolCalls,
           (update) => {
             broadcast('agent:progress', {
-              sessionId,
+              sessionId: targetSessionId,
               messageId: assistantMsg.id,
               stage: 'subagent_execution',
               percent: update.status === 'completed' ? 70 : 55,
@@ -1124,7 +1157,7 @@ async function handleChatMessage({ sessionId, content, providerConfig }) {
           },
           (approvalReq) => {
             broadcast('approval:required', {
-              sessionId,
+              sessionId: targetSessionId,
               messageId: assistantMsg.id,
               stepId: `appr_${Date.now()}`,
               approval: approvalReq
@@ -1149,7 +1182,7 @@ async function handleChatMessage({ sessionId, content, providerConfig }) {
           }
 
           recordedSteps.push(step);
-          broadcast('step:completed', { sessionId, messageId: assistantMsg.id, step });
+          broadcast('step:completed', { sessionId: targetSessionId, messageId: assistantMsg.id, step });
         }
 
         const requiresSynthesis = effectiveToolCalls.some((t) =>
@@ -1168,7 +1201,7 @@ async function handleChatMessage({ sessionId, content, providerConfig }) {
           }
           currentText = summary.trim();
           broadcast('message:token', {
-            sessionId,
+            sessionId: targetSessionId,
             messageId: assistantMsg.id,
             token: currentText,
             fullContent: currentText
@@ -1196,7 +1229,7 @@ async function handleChatMessage({ sessionId, content, providerConfig }) {
     }
 
     broadcast('agent:progress', {
-      sessionId,
+      sessionId: targetSessionId,
       messageId: assistantMsg.id,
       stage: 'completed',
       percent: 100,
@@ -1235,13 +1268,25 @@ async function handleChatMessage({ sessionId, content, providerConfig }) {
       }
     }
 
-    storage.updateMessage(sessionId, assistantMsg.id, {
+    storage.updateMessage(targetSessionId, assistantMsg.id, {
       content: currentText,
       steps: recordedSteps
     });
 
+    broadcast('agent:complete', {
+      sessionId: targetSessionId,
+      messageId: assistantMsg.id,
+      content: currentText,
+      steps: recordedSteps
+    });
     broadcast('message:completed', {
-      sessionId,
+      sessionId: targetSessionId,
+      messageId: assistantMsg.id,
+      content: currentText,
+      steps: recordedSteps
+    });
+    broadcast('message:complete', {
+      sessionId: targetSessionId,
       messageId: assistantMsg.id,
       content: currentText,
       steps: recordedSteps
@@ -1304,18 +1349,30 @@ async function handleChatMessage({ sessionId, content, providerConfig }) {
     }
 
     currentText = fallbackText;
-    storage.updateMessage(sessionId, assistantMsg.id, {
+    storage.updateMessage(targetSessionId, assistantMsg.id, {
+      content: currentText,
+      steps: recordedSteps
+    });
+    broadcast('agent:complete', {
+      sessionId: targetSessionId,
+      messageId: assistantMsg.id,
       content: currentText,
       steps: recordedSteps
     });
     broadcast('message:completed', {
-      sessionId,
+      sessionId: targetSessionId,
+      messageId: assistantMsg.id,
+      content: currentText,
+      steps: recordedSteps
+    });
+    broadcast('message:complete', {
+      sessionId: targetSessionId,
       messageId: assistantMsg.id,
       content: currentText,
       steps: recordedSteps
     });
     broadcast('message:error', {
-      sessionId,
+      sessionId: targetSessionId,
       messageId: assistantMsg.id,
       error: err.message,
       content: currentText

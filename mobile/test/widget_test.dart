@@ -183,11 +183,11 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.byType(ChatScreen), findsOneWidget);
 
-    // 8. Test Killswitch Dialog
+    // 8. Test Lock PC Dialog
     await tester.tap(find.byKey(const Key('killswitch_btn')));
     await tester.pump(const Duration(milliseconds: 300));
-    expect(find.text('Emergency Killswitch'), findsOneWidget);
-    expect(find.text('Lock Workstation Now'), findsOneWidget);
+    expect(find.text('Lock Workstation?'), findsWidgets);
+    expect(find.widgetWithText(ElevatedButton, 'Lock PC'), findsOneWidget);
   });
 
   testWidgets('MainShell AppBar never overflows on small/compact mobile screen widths',
