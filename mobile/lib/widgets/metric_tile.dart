@@ -20,11 +20,18 @@ class MetricTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: GeminiColors.elevatedCard,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: GeminiColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -33,19 +40,35 @@ class MetricTile extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(title, style: const TextStyle(color: GeminiColors.textMuted, fontSize: 12)),
+              Text(
+                title,
+                style: const TextStyle(
+                  color: GeminiColors.textSecondary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
               Icon(icon, color: GeminiColors.primary, size: 18),
             ],
           ),
           Text(
             value,
             style: const TextStyle(
-              color: GeminiColors.textPrimary,
+              color: GeminiColors.textHeading,
               fontSize: 20,
               fontWeight: FontWeight.bold,
+              letterSpacing: -0.3,
             ),
           ),
-          Text(subtitle, style: const TextStyle(color: GeminiColors.textMuted, fontSize: 11)),
+          Text(
+            subtitle,
+            style: const TextStyle(
+              color: GeminiColors.textSecondary,
+              fontSize: 11,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
           ClipRRect(
             borderRadius: BorderRadius.circular(4),
             child: LinearProgressIndicator(

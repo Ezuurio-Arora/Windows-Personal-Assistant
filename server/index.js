@@ -453,8 +453,8 @@ app.get('/api/qr', async (req, res) => {
     margin: 2,
     width: 320,
     color: {
-      dark: '#7DACF8', // Gemini Sparkle Blue
-      light: '#1E1F20' // Gemini Surface Container
+      dark: '#000000',
+      light: '#FFFFFF'
     }
   };
 

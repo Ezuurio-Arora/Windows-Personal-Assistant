@@ -335,7 +335,9 @@ export function PairingModal({ isOpen, onClose }) {
                     <span>Generating Secure QR Code...</span>
                   </div>
                 ) : currentQr ? (
-                  <img src={currentQr} alt="Pairing QR" className="w-52 h-52 rounded-xl" />
+                  <div className="bg-white p-3 rounded-2xl shadow-xl inline-block">
+                    <img src={currentQr} alt="Pairing QR" className="w-52 h-52 rounded-xl" />
+                  </div>
                 ) : (
                   <div className="w-52 h-52 flex flex-col items-center justify-center text-rose-400 text-xs p-4">
                     <span>Tunnel not available yet.</span>

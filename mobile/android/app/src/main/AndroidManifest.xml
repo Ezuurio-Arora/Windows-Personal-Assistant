@@ -19,6 +19,9 @@
     <!-- Native Voice Dictation (R7) -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
+    <!-- Notifications for AI Completion (Background Alerts) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <!-- Haptic Feedback on Killswitch & Quick Actions (R4, R6) -->
     <uses-permission android:name="android.permission.VIBRATE" />
 

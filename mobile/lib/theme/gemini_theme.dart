@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-/// Authoritative Google Gemini 2.0 Dark Aesthetic Color Tokens
+/// Authoritative Google Gemini / Material You AMOLED Dark Aesthetic Color Tokens
 abstract class GeminiColors {
-  // Canvases & Surfaces
-  static const Color canvas = Color(0xFF131314);
-  static const Color surfaceContainer = Color(0xFF1E1F20);
-  static const Color elevatedCard = Color(0xFF282A2C);
-  static const Color hover = Color(0xFF333538);
-  static const Color border = Color(0xFF3C4043);
+  // Pure AMOLED Canvases & Obsidian Surfaces
+  static const Color canvas = Color(0xFF000000);          // Pure AMOLED Black
+  static const Color surfaceContainer = Color(0xFF0D0E11); // Deep Obsidian
+  static const Color elevatedCard = Color(0xFF16171A);     // Card Surface
+  static const Color hover = Color(0xFF1F2126);            // Card Hover / Pressed
+  static const Color border = Color(0xFF26282D);           // Subtle glowing border
 
   // Gemini Signature Accents
   static const Color primary = Color(0xFF7DACF8);       // Gemini Blue
@@ -23,16 +23,31 @@ abstract class GeminiColors {
   static const Color accentPurple = purpleProgress;
 
   // Status & Safety Accents
-  static const Color emergencyDanger = Color(0xFFF28B82); // Killswitch & Error
+  static const Color emergencyDanger = Color(0xFFFF5252); // Coral Danger
   static const Color dangerRed = emergencyDanger;
   static const Color success = Color(0xFF81C995);          // Connected / Healthy
   static const Color successGreen = success;
   static const Color warning = Color(0xFFFDD663);          // Reconnecting / Tiered Alert
   static const Color warningYellow = warning;
 
-  // Typography Tokens
-  static const Color textPrimary = Color(0xFFE3E3E3);
-  static const Color textMuted = Color(0xFF8E918F);
+  // Typography Tokens - NO muddy washed-out greys
+  static const Color textHeading = Color(0xFFFFFFFF);     // Pure crisp white for headings
+  static const Color textPrompt = Color(0xFFFFFFFF);      // Pure crisp white for user prompts
+  static const Color textPrimary = Color(0xFFFFFFFF);     // Pure crisp white
+  static const Color textBody = Color(0xFFE3E3E3);        // Body text
+  static const Color textSecondary = Color(0xFF9AA0A6);   // Secondary hints
+  static const Color textMuted = Color(0xFF9AA0A6);       // Secondary hints
+
+  // Subtle Glowing Card Border Gradient
+  static const LinearGradient cardBorderGradient = LinearGradient(
+    colors: [
+      Color(0x337DACF8),
+      Color(0x22B87CF8),
+      Color(0xFF26282D),
+    ],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
 
   // Gradient Signatures
   static const LinearGradient geminiGradient = LinearGradient(
@@ -44,7 +59,7 @@ abstract class GeminiColors {
   static const LinearGradient shimmerGradient = LinearGradient(
     colors: [
       Colors.transparent,
-      Color(0x66FFFFFF),
+      Color(0x44FFFFFF),
       Colors.transparent,
     ],
     begin: Alignment.centerLeft,
@@ -52,12 +67,12 @@ abstract class GeminiColors {
   );
 }
 
-/// Geometric Corner Radii conforming to Gemini 2.0 Specifications
+/// Geometric Corner Radii conforming to Gemini / Material You Specifications
 abstract class GeminiRadii {
   static const double rChatBubble = 18.0;
-  static const double rCard = 24.0;
-  static const double rPill = 32.0;
-  static const double rControl = 14.0;
+  static const double rCard = 28.0;   // Material You large squircle radius
+  static const double rPill = 32.0;   // Material You pill radius
+  static const double rControl = 16.0;
 
   static const BorderRadius chatBubble = BorderRadius.all(Radius.circular(rChatBubble));
   static const BorderRadius userChatBubble = BorderRadius.only(
@@ -95,6 +110,7 @@ class GeminiThemeExtension extends ThemeExtension<GeminiThemeExtension> {
   final Color success;
   final Color warning;
   final Color textPrimary;
+  final Color textBody;
   final Color textMuted;
   final LinearGradient geminiGradient;
 
@@ -109,6 +125,7 @@ class GeminiThemeExtension extends ThemeExtension<GeminiThemeExtension> {
     required this.success,
     required this.warning,
     required this.textPrimary,
+    this.textBody = GeminiColors.textBody,
     required this.textMuted,
     required this.geminiGradient,
   });
@@ -124,6 +141,7 @@ class GeminiThemeExtension extends ThemeExtension<GeminiThemeExtension> {
     success: GeminiColors.success,
     warning: GeminiColors.warning,
     textPrimary: GeminiColors.textPrimary,
+    textBody: GeminiColors.textBody,
     textMuted: GeminiColors.textMuted,
     geminiGradient: GeminiColors.geminiGradient,
   );
@@ -140,6 +158,7 @@ class GeminiThemeExtension extends ThemeExtension<GeminiThemeExtension> {
     Color? success,
     Color? warning,
     Color? textPrimary,
+    Color? textBody,
     Color? textMuted,
     LinearGradient? geminiGradient,
   }) {
@@ -154,6 +173,7 @@ class GeminiThemeExtension extends ThemeExtension<GeminiThemeExtension> {
       success: success ?? this.success,
       warning: warning ?? this.warning,
       textPrimary: textPrimary ?? this.textPrimary,
+      textBody: textBody ?? this.textBody,
       textMuted: textMuted ?? this.textMuted,
       geminiGradient: geminiGradient ?? this.geminiGradient,
     );
@@ -173,6 +193,7 @@ class GeminiThemeExtension extends ThemeExtension<GeminiThemeExtension> {
       success: Color.lerp(success, other.success, t) ?? success,
       warning: Color.lerp(warning, other.warning, t) ?? warning,
       textPrimary: Color.lerp(textPrimary, other.textPrimary, t) ?? textPrimary,
+      textBody: Color.lerp(textBody, other.textBody, t) ?? textBody,
       textMuted: Color.lerp(textMuted, other.textMuted, t) ?? textMuted,
       geminiGradient: t < 0.5 ? geminiGradient : other.geminiGradient,
     );
@@ -204,52 +225,52 @@ abstract class GeminiTheme {
       displayLarge: baseTextTheme.displayLarge?.copyWith(
         fontSize: 32.0,
         fontWeight: FontWeight.w700,
-        color: GeminiColors.textPrimary,
+        color: GeminiColors.textHeading,
       ),
       headlineMedium: baseTextTheme.headlineMedium?.copyWith(
         fontSize: 24.0,
         fontWeight: FontWeight.w600,
-        color: GeminiColors.textPrimary,
+        color: GeminiColors.textHeading,
       ),
       titleLarge: baseTextTheme.titleLarge?.copyWith(
         fontSize: 20.0,
         fontWeight: FontWeight.w600,
-        color: GeminiColors.textPrimary,
+        color: GeminiColors.textHeading,
       ),
       titleMedium: baseTextTheme.titleMedium?.copyWith(
         fontSize: 16.0,
         fontWeight: FontWeight.w600,
-        color: GeminiColors.textPrimary,
+        color: GeminiColors.textHeading,
       ),
       bodyLarge: baseTextTheme.bodyLarge?.copyWith(
         fontSize: 16.0,
         fontWeight: FontWeight.w400,
-        color: GeminiColors.textPrimary,
+        color: GeminiColors.textBody,
       ),
       bodyMedium: baseTextTheme.bodyMedium?.copyWith(
         fontSize: 14.0,
         fontWeight: FontWeight.w400,
-        color: GeminiColors.textPrimary,
+        color: GeminiColors.textBody,
       ),
       bodySmall: baseTextTheme.bodySmall?.copyWith(
         fontSize: 12.0,
         fontWeight: FontWeight.w400,
-        color: GeminiColors.textMuted,
+        color: GeminiColors.textSecondary,
       ),
       labelLarge: baseTextTheme.labelLarge?.copyWith(
         fontSize: 14.0,
         fontWeight: FontWeight.w600,
-        color: GeminiColors.textPrimary,
+        color: GeminiColors.textHeading,
       ),
       labelMedium: baseTextTheme.labelMedium?.copyWith(
         fontSize: 12.0,
         fontWeight: FontWeight.w500,
-        color: GeminiColors.textMuted,
+        color: GeminiColors.textSecondary,
       ),
       labelSmall: baseTextTheme.labelSmall?.copyWith(
         fontSize: 10.0,
         fontWeight: FontWeight.w500,
-        color: GeminiColors.textMuted,
+        color: GeminiColors.textSecondary,
       ),
     );
 
@@ -273,8 +294,8 @@ abstract class GeminiTheme {
         onError: GeminiColors.canvas,
         outline: GeminiColors.border,
         outlineVariant: GeminiColors.border,
-        onSurface: GeminiColors.textPrimary,
-        onSurfaceVariant: GeminiColors.textMuted,
+        onSurface: GeminiColors.textBody,
+        onSurfaceVariant: GeminiColors.textSecondary,
       ),
       cardTheme: CardThemeData(
         color: GeminiColors.elevatedCard,
@@ -288,19 +309,19 @@ abstract class GeminiTheme {
         backgroundColor: GeminiColors.surfaceContainer,
         elevation: 0,
         scrolledUnderElevation: 0,
-        iconTheme: IconThemeData(color: GeminiColors.textPrimary),
+        iconTheme: IconThemeData(color: GeminiColors.textHeading),
         titleTextStyle: TextStyle(
-          color: GeminiColors.textPrimary,
+          color: GeminiColors.textHeading,
           fontSize: 18.0,
           fontWeight: FontWeight.w600,
         ),
       ),
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: GeminiColors.surfaceContainer,
-        indicatorColor: const Color(0x287DACF8), // Subtle #7DACF8 tint
+        indicatorColor: const Color(0x287DACF8),
         indicatorShape: const StadiumBorder(),
-        labelTextStyle: MaterialStateProperty.resolveWith((states) {
-          if (states.contains(MaterialState.selected)) {
+        labelTextStyle: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
             return const TextStyle(
               color: GeminiColors.primary,
               fontSize: 12,
@@ -308,17 +329,34 @@ abstract class GeminiTheme {
             );
           }
           return const TextStyle(
-            color: GeminiColors.textMuted,
+            color: GeminiColors.textSecondary,
             fontSize: 12,
             fontWeight: FontWeight.w400,
           );
         }),
-        iconTheme: MaterialStateProperty.resolveWith((states) {
-          if (states.contains(MaterialState.selected)) {
+        iconTheme: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
             return const IconThemeData(color: GeminiColors.primary);
           }
-          return const IconThemeData(color: GeminiColors.textMuted);
+          return const IconThemeData(color: GeminiColors.textSecondary);
         }),
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: GeminiColors.surfaceContainer,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: GeminiRadii.card,
+          side: const BorderSide(color: GeminiColors.border, width: 1),
+        ),
+        titleTextStyle: const TextStyle(
+          color: GeminiColors.textHeading,
+          fontSize: 18,
+          fontWeight: FontWeight.w600,
+        ),
+        contentTextStyle: const TextStyle(
+          color: GeminiColors.textBody,
+          fontSize: 14,
+        ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
@@ -335,7 +373,7 @@ abstract class GeminiTheme {
           borderRadius: GeminiRadii.pill,
           borderSide: const BorderSide(color: GeminiColors.primary, width: 1.5),
         ),
-        hintStyle: const TextStyle(color: GeminiColors.textMuted, fontSize: 14),
+        hintStyle: const TextStyle(color: GeminiColors.textSecondary, fontSize: 14),
         contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
       ),
       textTheme: textTheme,

@@ -10,6 +10,8 @@ abstract class AuthService {
   Future<void> saveSession(DeviceSession session);
   Future<void> clearSession();
   Future<bool> hasValidSession();
+  Future<bool> isBiometricLockEnabled();
+  Future<void> setBiometricLockEnabled(bool enabled);
 }
 
 class SecureAuthService implements AuthService {
@@ -17,6 +19,7 @@ class SecureAuthService implements AuthService {
   final FlutterSecureStorage _storage;
 
   static const String _sessionKey = 'personal_assistant_device_session';
+  static const String _biometricLockKey = 'biometric_lock_enabled';
 
   SecureAuthService({
     LocalAuthentication? localAuth,
@@ -85,5 +88,23 @@ class SecureAuthService implements AuthService {
   Future<bool> hasValidSession() async {
     final session = await loadSession();
     return session != null && session.sessionToken.isNotEmpty;
+  }
+
+  @override
+  Future<bool> isBiometricLockEnabled() async {
+    try {
+      final raw = await _storage.read(key: _biometricLockKey);
+      if (raw == null) {
+        return true; // Default to true
+      }
+      return raw == 'true';
+    } catch (_) {
+      return true;
+    }
+  }
+
+  @override
+  Future<void> setBiometricLockEnabled(bool enabled) async {
+    await _storage.write(key: _biometricLockKey, value: enabled.toString());
   }
 }

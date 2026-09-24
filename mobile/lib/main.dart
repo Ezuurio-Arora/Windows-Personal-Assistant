@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'theme/gemini_theme.dart';
 import 'services/auth_service.dart';
 import 'services/hmac_service.dart';
 import 'services/socket_service.dart';
+import 'services/notification_service.dart';
 import 'providers/connection_provider.dart';
 import 'providers/chat_provider.dart';
 import 'providers/actions_provider.dart';
@@ -17,12 +19,15 @@ void main() async {
   final authService = SecureAuthService();
   final hmacService = CryptoHmacService();
   final socketService = WebSocketChannelService(hmacService: hmacService);
+  final notificationService = LocalNotificationService();
+  await notificationService.initialize();
 
   runApp(
     PersonalAssistantApp(
       authService: authService,
       hmacService: hmacService,
       socketService: socketService,
+      notificationService: notificationService,
     ),
   );
 }
@@ -31,21 +36,26 @@ class PersonalAssistantApp extends StatelessWidget {
   final AuthService authService;
   final HmacService hmacService;
   final SocketService socketService;
+  final NotificationService? notificationService;
 
   const PersonalAssistantApp({
     super.key,
     required this.authService,
     required this.hmacService,
     required this.socketService,
+    this.notificationService,
   });
 
   @override
   Widget build(BuildContext context) {
+    final notif = notificationService ?? LocalNotificationService();
+
     return MultiProvider(
       providers: [
         Provider<AuthService>.value(value: authService),
         Provider<HmacService>.value(value: hmacService),
         Provider<SocketService>.value(value: socketService),
+        Provider<NotificationService>.value(value: notif),
         ChangeNotifierProvider<ConnectionProvider>(
           create: (_) => ConnectionProvider(
             authService: authService,
@@ -57,10 +67,12 @@ class PersonalAssistantApp extends StatelessWidget {
           create: (ctx) => ChatProvider(
             socketService: socketService,
             connectionProvider: ctx.read<ConnectionProvider>(),
+            notificationService: notif,
           ),
           update: (ctx, conn, previous) => previous ?? ChatProvider(
             socketService: socketService,
             connectionProvider: conn,
+            notificationService: notif,
           ),
         ),
         ChangeNotifierProxyProvider<ConnectionProvider, ActionsProvider>(
@@ -116,7 +128,8 @@ class _AppRootGateState extends State<AppRootGate> {
   Future<void> _checkBiometrics() async {
     final auth = context.read<AuthService>();
     final hasSession = await auth.hasValidSession();
-    if (hasSession) {
+    final isLockEnabled = await auth.isBiometricLockEnabled();
+    if (hasSession && isLockEnabled) {
       final passed = await auth.authenticateWithBiometrics(
         reason: 'Unlock Personal Assistant PC Companion',
       );

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../providers/screen_stream_provider.dart';
 import '../theme/gemini_theme.dart';
@@ -29,17 +30,25 @@ class _ScreenStreamViewState extends State<ScreenStreamView> {
         children: [
           // Stream Control Bar
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            color: GeminiColors.surfaceContainer,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: const BoxDecoration(
+              color: GeminiColors.surfaceContainer,
+              border: Border(
+                bottom: BorderSide(color: GeminiColors.border, width: 1),
+              ),
+            ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Row(
                   children: [
                     ElevatedButton.icon(
-                      onPressed: () => streamProvider.toggleStream(),
+                      onPressed: () {
+                        HapticFeedback.lightImpact();
+                        streamProvider.toggleStream();
+                      },
                       icon: Icon(
-                        streamProvider.isStreaming ? Icons.stop : Icons.play_arrow,
+                        streamProvider.isStreaming ? Icons.stop_rounded : Icons.play_arrow_rounded,
                         size: 18,
                         color: streamProvider.isStreaming
                             ? Colors.white
@@ -59,8 +68,8 @@ class _ScreenStreamViewState extends State<ScreenStreamView> {
                         backgroundColor: streamProvider.isStreaming
                             ? GeminiColors.emergencyDanger
                             : GeminiColors.primary,
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                         elevation: 0,
                       ),
                     ),
@@ -70,7 +79,7 @@ class _ScreenStreamViewState extends State<ScreenStreamView> {
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
                           color: GeminiColors.elevatedCard,
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(12),
                           border: Border.all(color: GeminiColors.border),
                         ),
                         child: Text(
@@ -87,10 +96,13 @@ class _ScreenStreamViewState extends State<ScreenStreamView> {
                 ),
                 IconButton(
                   icon: Icon(
-                    streamProvider.isFullscreen ? Icons.fullscreen_exit : Icons.fullscreen,
-                    color: GeminiColors.textPrimary,
+                    streamProvider.isFullscreen ? Icons.fullscreen_exit_rounded : Icons.fullscreen_rounded,
+                    color: GeminiColors.textHeading,
                   ),
-                  onPressed: () => streamProvider.toggleFullscreen(),
+                  onPressed: () {
+                    HapticFeedback.lightImpact();
+                    streamProvider.toggleFullscreen();
+                  },
                 ),
               ],
             ),
@@ -109,7 +121,7 @@ class _ScreenStreamViewState extends State<ScreenStreamView> {
                             SizedBox(height: 16),
                             Text(
                               'Establishing low-latency stream...',
-                              style: TextStyle(color: GeminiColors.textMuted, fontSize: 13),
+                              style: TextStyle(color: GeminiColors.textSecondary, fontSize: 13),
                             ),
                           ],
                         )
@@ -142,6 +154,13 @@ class _ScreenStreamViewState extends State<ScreenStreamView> {
             color: GeminiColors.surfaceContainer,
             shape: BoxShape.circle,
             border: Border.all(color: GeminiColors.border),
+            boxShadow: [
+              BoxShadow(
+                color: GeminiColors.primary.withOpacity(0.08),
+                blurRadius: 24,
+                spreadRadius: 2,
+              ),
+            ],
           ),
           child: const Icon(
             Icons.desktop_windows_outlined,
@@ -153,9 +172,10 @@ class _ScreenStreamViewState extends State<ScreenStreamView> {
         const Text(
           'On-Demand Desktop Stream',
           style: TextStyle(
-            color: GeminiColors.textPrimary,
+            color: GeminiColors.textHeading,
             fontSize: 18,
             fontWeight: FontWeight.w600,
+            letterSpacing: -0.2,
           ),
         ),
         const SizedBox(height: 6),
@@ -163,22 +183,26 @@ class _ScreenStreamViewState extends State<ScreenStreamView> {
           padding: EdgeInsets.symmetric(horizontal: 40),
           child: Text(
             'Screen capture runs strictly on-demand to conserve battery and LAN bandwidth. Pinch to zoom up to 4.0x.',
-            style: TextStyle(color: GeminiColors.textMuted, fontSize: 13),
+            style: TextStyle(color: GeminiColors.textSecondary, fontSize: 13),
             textAlign: TextAlign.center,
           ),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 24),
         ElevatedButton.icon(
-          onPressed: () => streamProvider.startStream(),
-          icon: const Icon(Icons.videocam, color: GeminiColors.canvas, size: 18),
+          onPressed: () {
+            HapticFeedback.lightImpact();
+            streamProvider.startStream();
+          },
+          icon: const Icon(Icons.videocam_rounded, color: GeminiColors.canvas, size: 18),
           label: const Text(
             'Start Screen Stream',
             style: TextStyle(color: GeminiColors.canvas, fontWeight: FontWeight.bold),
           ),
           style: ElevatedButton.styleFrom(
             backgroundColor: GeminiColors.primary,
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+            padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+            elevation: 0,
           ),
         ),
       ],

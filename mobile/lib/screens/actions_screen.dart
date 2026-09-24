@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../providers/actions_provider.dart';
 import '../theme/gemini_theme.dart';
@@ -16,6 +17,7 @@ class ActionsScreen extends StatelessWidget {
       backgroundColor: GeminiColors.canvas,
       body: RefreshIndicator(
         onRefresh: () async {
+          HapticFeedback.lightImpact();
           actions.refreshMetrics();
           actions.refreshWindows();
         },
@@ -31,14 +33,16 @@ class ActionsScreen extends StatelessWidget {
                 const Text(
                   'Hardware Telemetry',
                   style: TextStyle(
-                    color: GeminiColors.textPrimary,
+                    color: GeminiColors.textHeading,
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
+                    letterSpacing: -0.2,
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.refresh, color: GeminiColors.primary, size: 20),
+                  icon: const Icon(Icons.refresh_rounded, color: GeminiColors.primary, size: 20),
                   onPressed: () {
+                    HapticFeedback.lightImpact();
                     actions.refreshMetrics();
                     actions.refreshWindows();
                   },
@@ -60,21 +64,21 @@ class ActionsScreen extends StatelessWidget {
                   title: 'CPU Usage',
                   value: metrics.formattedCpuUsage,
                   subtitle: '${metrics.cpu.cores} Cores • ${metrics.cpu.model}',
-                  icon: Icons.memory,
+                  icon: Icons.memory_rounded,
                   progressPercent: metrics.cpu.loadPercent,
                 ),
                 MetricTile(
                   title: 'Memory (RAM)',
                   value: metrics.formattedMemoryUsage,
                   subtitle: '${metrics.memory.usedPercent.toStringAsFixed(0)}% Utilized',
-                  icon: Icons.storage,
+                  icon: Icons.storage_rounded,
                   progressPercent: metrics.memory.usedPercent,
                 ),
                 MetricTile(
                   title: 'GPU',
                   value: metrics.formattedGpuUsage,
                   subtitle: metrics.gpu.name,
-                  icon: Icons.videogame_asset,
+                  icon: Icons.videogame_asset_rounded,
                   progressPercent: metrics.gpu.loadPercent,
                 ),
                 MetricTile(
@@ -83,7 +87,7 @@ class ActionsScreen extends StatelessWidget {
                       ? '${metrics.battery.percent ?? 0}%'
                       : 'AC Power',
                   subtitle: metrics.battery.status,
-                  icon: metrics.battery.hasBattery ? Icons.battery_full : Icons.power,
+                  icon: metrics.battery.hasBattery ? Icons.battery_full_rounded : Icons.power_rounded,
                   progressPercent: (metrics.battery.percent ?? 100).toDouble(),
                 ),
               ],
@@ -94,9 +98,10 @@ class ActionsScreen extends StatelessWidget {
             const Text(
               'Master Audio Volume',
               style: TextStyle(
-                color: GeminiColors.textPrimary,
+                color: GeminiColors.textHeading,
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
+                letterSpacing: -0.2,
               ),
             ),
             const SizedBox(height: 12),
@@ -104,17 +109,27 @@ class ActionsScreen extends StatelessWidget {
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: GeminiColors.surfaceContainer,
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(24),
                 border: Border.all(color: GeminiColors.border),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.2),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
               child: Row(
                 children: [
                   IconButton(
                     icon: Icon(
-                      actions.isMuted ? Icons.volume_off : Icons.volume_up,
+                      actions.isMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
                       color: actions.isMuted ? GeminiColors.emergencyDanger : GeminiColors.primary,
                     ),
-                    onPressed: () => actions.toggleMute(),
+                    onPressed: () {
+                      HapticFeedback.lightImpact();
+                      actions.toggleMute();
+                    },
                   ),
                   Expanded(
                     child: SliderTheme(
@@ -122,6 +137,7 @@ class ActionsScreen extends StatelessWidget {
                         activeTrackColor: GeminiColors.primary,
                         inactiveTrackColor: GeminiColors.border,
                         thumbColor: GeminiColors.primary,
+                        overlayColor: GeminiColors.primary.withOpacity(0.12),
                       ),
                       child: Slider(
                         value: actions.volumeLevel.toDouble(),
@@ -134,7 +150,7 @@ class ActionsScreen extends StatelessWidget {
                   Text(
                     actions.isMuted ? 'Muted' : '${actions.volumeLevel}%',
                     style: const TextStyle(
-                      color: GeminiColors.textPrimary,
+                      color: GeminiColors.textHeading,
                       fontWeight: FontWeight.bold,
                       fontSize: 13,
                     ),
@@ -148,9 +164,10 @@ class ActionsScreen extends StatelessWidget {
             const Text(
               'Instant Timers',
               style: TextStyle(
-                color: GeminiColors.textPrimary,
+                color: GeminiColors.textHeading,
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
+                letterSpacing: -0.2,
               ),
             ),
             const SizedBox(height: 12),
@@ -174,30 +191,35 @@ class ActionsScreen extends StatelessWidget {
                 const Text(
                   'Desktop Window Switcher',
                   style: TextStyle(
-                    color: GeminiColors.textPrimary,
+                    color: GeminiColors.textHeading,
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
+                    letterSpacing: -0.2,
                   ),
                 ),
-                TextButton(
-                  onPressed: () => actions.refreshWindows(),
-                  child: const Text('Refresh', style: TextStyle(color: GeminiColors.primary)),
+                TextButton.icon(
+                  onPressed: () {
+                    HapticFeedback.lightImpact();
+                    actions.refreshWindows();
+                  },
+                  icon: const Icon(Icons.refresh_rounded, size: 16, color: GeminiColors.primary),
+                  label: const Text('Refresh', style: TextStyle(color: GeminiColors.primary, fontWeight: FontWeight.w600)),
                 ),
               ],
             ),
             const SizedBox(height: 8),
             if (actions.windows.isEmpty)
               Container(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
                   color: GeminiColors.surfaceContainer,
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(20),
                   border: Border.all(color: GeminiColors.border),
                 ),
                 child: const Center(
                   child: Text(
                     'No open windows reported. Tap Refresh.',
-                    style: TextStyle(color: GeminiColors.textMuted),
+                    style: TextStyle(color: GeminiColors.textSecondary),
                   ),
                 ),
               )
@@ -207,23 +229,32 @@ class ActionsScreen extends StatelessWidget {
                   margin: const EdgeInsets.only(bottom: 8),
                   decoration: BoxDecoration(
                     color: w.isActive ? GeminiColors.elevatedCard : GeminiColors.surfaceContainer,
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(18),
                     border: Border.all(
                       color: w.isActive ? GeminiColors.primary : GeminiColors.border,
                       width: w.isActive ? 1.5 : 1,
                     ),
+                    boxShadow: w.isActive
+                        ? [
+                            BoxShadow(
+                              color: GeminiColors.primary.withOpacity(0.1),
+                              blurRadius: 10,
+                              spreadRadius: 1,
+                            ),
+                          ]
+                        : null,
                   ),
                   child: ListTile(
                     dense: true,
                     leading: Icon(
-                      Icons.desktop_windows,
-                      color: w.isActive ? GeminiColors.primary : GeminiColors.textMuted,
+                      Icons.desktop_windows_rounded,
+                      color: w.isActive ? GeminiColors.primary : GeminiColors.textSecondary,
                       size: 20,
                     ),
                     title: Text(
                       w.title,
-                      style: const TextStyle(
-                        color: GeminiColors.textPrimary,
+                      style: TextStyle(
+                        color: w.isActive ? GeminiColors.textHeading : GeminiColors.textBody,
                         fontSize: 13,
                         fontWeight: FontWeight.w500,
                       ),
@@ -232,22 +263,24 @@ class ActionsScreen extends StatelessWidget {
                     ),
                     subtitle: Text(
                       '${w.process} • PID ${w.pid}',
-                      style: const TextStyle(color: GeminiColors.textMuted, fontSize: 11),
+                      style: const TextStyle(color: GeminiColors.textSecondary, fontSize: 11),
                     ),
                     trailing: ElevatedButton(
-                      onPressed: () => actions.focusWindow(w.hwnd),
+                      onPressed: () {
+                        HapticFeedback.lightImpact();
+                        actions.focusWindow(w.hwnd);
+                      },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: w.isActive ? GeminiColors.primary : GeminiColors.elevatedCard,
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        foregroundColor: w.isActive ? GeminiColors.canvas : GeminiColors.textHeading,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                         minimumSize: Size.zero,
                         elevation: 0,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                       child: Text(
                         w.isActive ? 'Active' : 'Focus',
-                        style: TextStyle(
-                          color: w.isActive ? GeminiColors.canvas : GeminiColors.textPrimary,
-                          fontSize: 11,
-                        ),
+                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
                       ),
                     ),
                   ),
@@ -268,23 +301,31 @@ class ActionsScreen extends StatelessWidget {
     return Expanded(
       child: OutlinedButton(
         onPressed: () {
+          HapticFeedback.lightImpact();
           actions.startTimer(seconds, label);
+          ScaffoldMessenger.of(context).hideCurrentSnackBar();
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Started timer: $label'),
+              content: Text('Started timer: $label', style: const TextStyle(color: GeminiColors.textBody)),
               backgroundColor: GeminiColors.surfaceContainer,
               duration: const Duration(seconds: 2),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: const BorderSide(color: GeminiColors.border),
+              ),
             ),
           );
         },
         style: OutlinedButton.styleFrom(
+          backgroundColor: GeminiColors.elevatedCard,
           side: const BorderSide(color: GeminiColors.border),
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         ),
         child: Text(
           label,
-          style: const TextStyle(color: GeminiColors.textPrimary, fontSize: 12),
+          style: const TextStyle(color: GeminiColors.textHeading, fontSize: 12, fontWeight: FontWeight.w500),
         ),
       ),
     );

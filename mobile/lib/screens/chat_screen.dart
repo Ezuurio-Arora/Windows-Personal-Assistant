@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../models/chat_message.dart';
 import '../providers/chat_provider.dart';
@@ -60,7 +61,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         child: Text(
                           chat.subagentLabel!,
                           style: const TextStyle(
-                            color: GeminiColors.textPrimary,
+                            color: GeminiColors.textHeading,
                             fontSize: 12,
                             fontWeight: FontWeight.w500,
                           ),
@@ -77,7 +78,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     ],
                   ),
                   const SizedBox(height: 6),
-                  GeminiGradientBar(value: chat.subagentProgress, height: 2),
+                  GeminiGradientBar(value: chat.subagentProgress, height: 2.5),
                 ],
               ),
             ),
@@ -101,7 +102,12 @@ class _ChatScreenState extends State<ChatScreen> {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
             child: chat.isListening
-                ? WaveformPill(onStop: () => chat.stopListening(submit: true))
+                ? WaveformPill(
+                    onStop: () {
+                      HapticFeedback.lightImpact();
+                      chat.stopListening(submit: true);
+                    },
+                  )
                 : _buildFloatingInputBar(context, chat),
           ),
         ],
@@ -120,6 +126,13 @@ class _ChatScreenState extends State<ChatScreen> {
               color: GeminiColors.surfaceContainer,
               shape: BoxShape.circle,
               border: Border.all(color: GeminiColors.border),
+              boxShadow: [
+                BoxShadow(
+                  color: GeminiColors.primary.withOpacity(0.08),
+                  blurRadius: 24,
+                  spreadRadius: 2,
+                ),
+              ],
             ),
             child: const Icon(Icons.auto_awesome, color: GeminiColors.primary, size: 36),
           ),
@@ -127,15 +140,16 @@ class _ChatScreenState extends State<ChatScreen> {
           const Text(
             'Personal Assistant',
             style: TextStyle(
-              color: GeminiColors.textPrimary,
-              fontSize: 20,
+              color: GeminiColors.textHeading,
+              fontSize: 22,
               fontWeight: FontWeight.w600,
+              letterSpacing: -0.3,
             ),
           ),
           const SizedBox(height: 6),
           const Text(
             'Ask questions, run system actions, or control your PC.',
-            style: TextStyle(color: GeminiColors.textMuted, fontSize: 13),
+            style: TextStyle(color: GeminiColors.textSecondary, fontSize: 13),
             textAlign: TextAlign.center,
           ),
         ],
@@ -150,11 +164,11 @@ class _ChatScreenState extends State<ChatScreen> {
     if (isSystem) {
       return Container(
         margin: const EdgeInsets.symmetric(vertical: 8),
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: GeminiColors.surfaceContainer,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: GeminiColors.warning.withOpacity(0.5)),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: GeminiColors.warning.withOpacity(0.4)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -166,31 +180,38 @@ class _ChatScreenState extends State<ChatScreen> {
                 Expanded(
                   child: Text(
                     msg.content,
-                    style: const TextStyle(color: GeminiColors.textPrimary, fontSize: 13),
+                    style: const TextStyle(color: GeminiColors.textHeading, fontSize: 13),
                   ),
                 ),
               ],
             ),
             if (msg.stage == SubagentStage.approvalRequired && msg.approvalData != null) ...[
-              const SizedBox(height: 10),
+              const SizedBox(height: 12),
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   TextButton(
                     onPressed: () {
+                      HapticFeedback.lightImpact();
                       final id = msg.approvalData?['id'] as String? ?? '';
                       chat.sendApprovalResponse(id, false);
                     },
-                    child: const Text('Deny', style: TextStyle(color: GeminiColors.emergencyDanger)),
+                    child: const Text('Deny', style: TextStyle(color: GeminiColors.emergencyDanger, fontWeight: FontWeight.w600)),
                   ),
                   const SizedBox(width: 8),
                   ElevatedButton(
                     onPressed: () {
+                      HapticFeedback.lightImpact();
                       final id = msg.approvalData?['id'] as String? ?? '';
                       chat.sendApprovalResponse(id, true);
                     },
-                    style: ElevatedButton.styleFrom(backgroundColor: GeminiColors.success),
-                    child: const Text('Approve', style: TextStyle(color: GeminiColors.canvas)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: GeminiColors.success,
+                      foregroundColor: Colors.black,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    ),
+                    child: const Text('Approve', style: TextStyle(fontWeight: FontWeight.bold)),
                   ),
                 ],
               ),
@@ -210,14 +231,23 @@ class _ChatScreenState extends State<ChatScreen> {
           color: isUser ? GeminiColors.elevatedCard : GeminiColors.surfaceContainer,
           borderRadius: isUser ? GeminiRadii.userChatBubble : GeminiRadii.assistantChatBubble,
           border: Border.all(color: GeminiColors.border, width: 1),
+          boxShadow: isUser
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.2),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               msg.content,
-              style: const TextStyle(
-                color: GeminiColors.textPrimary,
+              style: TextStyle(
+                color: isUser ? GeminiColors.textPrompt : GeminiColors.textBody,
                 fontSize: 15,
                 height: 1.45,
               ),
@@ -233,11 +263,14 @@ class _ChatScreenState extends State<ChatScreen> {
                     constraints: const BoxConstraints(),
                     icon: Icon(
                       chat.currentlySpeakingId == msg.id
-                          ? Icons.volume_up
+                          ? Icons.volume_up_rounded
                           : Icons.volume_mute_outlined,
-                      color: GeminiColors.textMuted,
+                      color: GeminiColors.textSecondary,
                     ),
-                    onPressed: () => chat.toggleReadAloud(msg),
+                    onPressed: () {
+                      HapticFeedback.lightImpact();
+                      chat.toggleReadAloud(msg);
+                    },
                   ),
                   const SizedBox(width: 8),
                   if (msg.isStreaming)
@@ -260,6 +293,13 @@ class _ChatScreenState extends State<ChatScreen> {
         color: GeminiColors.surfaceContainer,
         borderRadius: GeminiRadii.pill,
         border: Border.all(color: GeminiColors.border, width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.4),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Row(
         children: [
@@ -267,10 +307,10 @@ class _ChatScreenState extends State<ChatScreen> {
           Expanded(
             child: TextField(
               controller: _textController,
-              style: const TextStyle(color: GeminiColors.textPrimary, fontSize: 14),
+              style: const TextStyle(color: GeminiColors.textPrompt, fontSize: 14),
               decoration: const InputDecoration(
                 hintText: 'Ask Gemini or command PC...',
-                hintStyle: TextStyle(color: GeminiColors.textMuted),
+                hintStyle: TextStyle(color: GeminiColors.textSecondary),
                 border: InputBorder.none,
                 enabledBorder: InputBorder.none,
                 focusedBorder: InputBorder.none,
@@ -278,6 +318,7 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
               onSubmitted: (val) {
                 if (val.trim().isNotEmpty) {
+                  HapticFeedback.lightImpact();
                   chat.sendMessage(val.trim());
                   _textController.clear();
                 }
@@ -285,14 +326,18 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.mic, color: GeminiColors.primary, size: 22),
-            onPressed: () => chat.startListening(),
+            icon: const Icon(Icons.mic_rounded, color: GeminiColors.primary, size: 22),
+            onPressed: () {
+              HapticFeedback.lightImpact();
+              chat.startListening();
+            },
           ),
           IconButton(
             icon: const Icon(Icons.send_rounded, color: GeminiColors.primary, size: 22),
             onPressed: () {
               final text = _textController.text.trim();
               if (text.isNotEmpty) {
+                HapticFeedback.lightImpact();
                 chat.sendMessage(text);
                 _textController.clear();
               }

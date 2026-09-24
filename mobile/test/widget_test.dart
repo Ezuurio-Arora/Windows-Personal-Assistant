@@ -33,6 +33,10 @@ class MockAuthService implements AuthService {
   Future<DeviceSession?> loadSession() async => null;
   @override
   Future<void> saveSession(DeviceSession session) async {}
+  @override
+  Future<bool> isBiometricLockEnabled() async => true;
+  @override
+  Future<void> setBiometricLockEnabled(bool enabled) async {}
 }
 
 class MockHmacService implements HmacService {
@@ -184,5 +188,51 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.text('Emergency Killswitch'), findsOneWidget);
     expect(find.text('Lock Workstation Now'), findsOneWidget);
+  });
+
+  testWidgets('MainShell AppBar never overflows on small/compact mobile screen widths',
+      (WidgetTester tester) async {
+    final mockAuth = MockAuthService();
+    final mockHmac = MockHmacService();
+    final mockSocket = MockSocketService();
+
+    final connProvider = ConnectionProvider(
+      authService: mockAuth,
+      hmacService: mockHmac,
+      socketService: mockSocket,
+    );
+
+    // Test across compact mobile widths: 320px (iPhone SE 1st gen), 360px (Standard Android), 390px (iPhone 14)
+    for (final width in [320.0, 360.0, 390.0]) {
+      tester.view.physicalSize = Size(width, 700.0);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider<ConnectionProvider>.value(value: connProvider),
+            ChangeNotifierProvider<ChatProvider>.value(
+              value: ChatProvider(socketService: mockSocket, connectionProvider: connProvider),
+            ),
+            ChangeNotifierProvider<ActionsProvider>.value(
+              value: ActionsProvider(socketService: mockSocket, connectionProvider: connProvider, hmacService: mockHmac),
+            ),
+            ChangeNotifierProvider<ScreenStreamProvider>.value(
+              value: ScreenStreamProvider(socketService: mockSocket, connectionProvider: connProvider),
+            ),
+          ],
+          child: MaterialApp(
+            theme: GeminiTheme.darkTheme,
+            home: const MainShell(),
+          ),
+        ),
+      );
+
+      // Verify that no RenderFlex overflow error was triggered
+      expect(tester.takeException(), isNull);
+      expect(find.descendant(of: find.byType(AppBar), matching: find.text('Personal Assistant')), findsOneWidget);
+      expect(find.byType(KillswitchButton), findsOneWidget);
+    }
   });
 }

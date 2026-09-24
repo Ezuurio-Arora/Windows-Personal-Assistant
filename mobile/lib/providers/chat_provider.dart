@@ -1,14 +1,18 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import '../models/chat_message.dart';
 import '../services/socket_service.dart';
+import '../services/notification_service.dart';
 import 'connection_provider.dart';
 
-class ChatProvider extends ChangeNotifier {
+class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
   final SocketService _socketService;
   final ConnectionProvider _connectionProvider;
+  final NotificationService _notificationService;
   final FlutterTts _tts;
   final stt.SpeechToText _speech;
 
@@ -22,20 +26,31 @@ class ChatProvider extends ChangeNotifier {
   String _sttBuffer = '';
   String? _currentlySpeakingId;
 
+  bool _isInBackground = false;
+  bool _isOnChatScreen = true;
+  int _lastCompletionTimestamp = 0;
+
   StreamSubscription? _eventSubscription;
 
   ChatProvider({
     required SocketService socketService,
     required ConnectionProvider connectionProvider,
+    NotificationService? notificationService,
     FlutterTts? tts,
     stt.SpeechToText? speech,
   })  : _socketService = socketService,
         _connectionProvider = connectionProvider,
+        _notificationService = notificationService ?? LocalNotificationService(),
         _tts = tts ?? FlutterTts(),
         _speech = speech ?? stt.SpeechToText() {
     _initTts();
+    WidgetsBinding.instance.addObserver(this);
     _eventSubscription = _socketService.eventStream.listen(_onSocketEvent);
   }
+
+  NotificationService get notificationService => _notificationService;
+  bool get isInBackground => _isInBackground;
+  bool get isOnChatScreen => _isOnChatScreen;
 
   List<ChatMessage> get messages => List.unmodifiable(_messages);
   bool get isStreaming => _isStreaming;
@@ -46,15 +61,30 @@ class ChatProvider extends ChangeNotifier {
   String get sttBuffer => _sttBuffer;
   String? get currentlySpeakingId => _currentlySpeakingId;
 
+  void updateAppInBackground(bool inBg) {
+    _isInBackground = inBg;
+  }
+
+  void updateChatScreenActive(bool active) {
+    _isOnChatScreen = active;
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _isInBackground = (state != AppLifecycleState.resumed);
+  }
+
   void _initTts() {
-    _tts.setCompletionHandler(() {
-      _currentlySpeakingId = null;
-      notifyListeners();
-    });
-    _tts.setErrorHandler((_) {
-      _currentlySpeakingId = null;
-      notifyListeners();
-    });
+    try {
+      _tts.setCompletionHandler(() {
+        _currentlySpeakingId = null;
+        notifyListeners();
+      });
+      _tts.setErrorHandler((_) {
+        _currentlySpeakingId = null;
+        notifyListeners();
+      });
+    } catch (_) {}
   }
 
   void _onSocketEvent(Map<String, dynamic> packet) {
@@ -67,6 +97,11 @@ class ChatProvider extends ChangeNotifier {
         break;
       case 'agent:progress':
         _handleProgress(data);
+        break;
+      case 'agent:complete':
+      case 'chat:complete':
+      case 'message:complete':
+        _handleAgentComplete(data);
         break;
       case 'step:completed':
         _handleStepCompleted(data);
@@ -127,8 +162,77 @@ class ChatProvider extends ChangeNotifier {
     if (stageStr == 'completed') {
       _isStreaming = false;
       _subagentProgress = 1.0;
+      _triggerAiCompletion(data);
     }
     notifyListeners();
+  }
+
+  void _handleAgentComplete(Map<String, dynamic> data) {
+    _isStreaming = false;
+    _subagentProgress = 1.0;
+    _subagentLabel = 'Completed';
+    if (_activeMessageId != null) {
+      final index = _messages.indexWhere((m) => m.id == _activeMessageId);
+      if (index != -1) {
+        _messages[index] = _messages[index].copyWith(
+          isStreaming: false,
+          progressPercent: 1.0,
+          stage: SubagentStage.completed,
+        );
+      }
+    }
+    _triggerAiCompletion(data);
+    notifyListeners();
+  }
+
+  Future<void> _triggerAiCompletion(Map<String, dynamic> data) async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if (now - _lastCompletionTimestamp < 1000) return;
+    _lastCompletionTimestamp = now;
+
+    // Trigger celebratory haptic pattern
+    try {
+      await HapticFeedback.mediumImpact();
+    } catch (_) {}
+
+    // Check if app is in background or user is not on the chat screen
+    if (_isInBackground || !_isOnChatScreen) {
+      final summary = _extractResponseSummary(data);
+      await _notificationService.showAiCompletionNotification(
+        title: 'Personal Assistant',
+        body: summary,
+      );
+    }
+  }
+
+  String _extractResponseSummary(Map<String, dynamic> data) {
+    if (data['summary'] is String && (data['summary'] as String).isNotEmpty) {
+      return data['summary'] as String;
+    }
+    if (data['response'] is String && (data['response'] as String).isNotEmpty) {
+      return data['response'] as String;
+    }
+    if (data['message'] is String && (data['message'] as String).isNotEmpty) {
+      return data['message'] as String;
+    }
+
+    for (int i = _messages.length - 1; i >= 0; i--) {
+      final msg = _messages[i];
+      if (msg.role == MessageRole.assistant && msg.content.trim().isNotEmpty) {
+        String clean = msg.content
+            .replaceAll(RegExp(r'```[\s\S]*?```'), '')
+            .replaceAll(RegExp(r'[\r\n]+'), ' ')
+            .trim();
+        if (clean.length > 120) {
+          clean = '${clean.substring(0, 117)}...';
+        }
+        if (clean.isNotEmpty) {
+          return clean;
+        }
+      }
+    }
+
+    return 'AI request completed.';
   }
 
   void _handleStepCompleted(Map<String, dynamic> data) {
@@ -230,8 +334,9 @@ class ChatProvider extends ChangeNotifier {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _eventSubscription?.cancel();
-    _tts.stop();
+    _tts.stop().catchError((_) {});
     super.dispose();
   }
 }
